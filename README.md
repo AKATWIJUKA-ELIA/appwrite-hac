@@ -1,26 +1,42 @@
-# Next.js starter kit with Appwrite
+# Quotebook
 
-Kickstart your Next.js development with this ready-to-use starter project integrated with [Appwrite](https://www.appwrite.io)
+A procurement agent built on Appwrite. State a need in plain language — Quotebook
+finds suppliers, emails them for real quotes, reads the replies, and lines the
+answers up on a live comparison board.
 
-## 🚀Getting started
+> 50 × Dell Latitude 5550, i7/16GB/512GB, delivered to Kampala within 14 days,
+> budget UGX 180,000,000
 
-###
-Clone the Project
-Clone this repository to your local machine using Git:
+Built for the [Appwrite Hackathon](https://hackathon.appwrite.io) (Oct 19–31, 2026).
+The idea grew out of an earlier prototype I built on Convex; this repository is a
+new implementation on Appwrite, written during the hackathon.
 
-`git clone https://github.com/appwrite/starter-for-nextjs`
+## Stack
 
-## 🛠️ Development guid
-1. **Configure Appwrite**<br/>
-   Navigate to `.env` and update the values to match your Appwrite project credentials.
-2. **Customize as needed**<br/>
-   Modify the starter kit to suit your app's requirements. Adjust UI, features, or backend
-   integrations as per your needs.
-3. **Install dependencies**<br/>
-   Run `npm install` to install all dependencies.
-4. **Run the app**<br/>
-   Start the project by running `npm run dev`.
+| Layer | Technology |
+| --- | --- |
+| Frontend | Next.js 16 (App Router), React 19, TypeScript |
+| UI | Tailwind CSS v4, shadcn/ui |
+| Database | Appwrite TablesDB |
+| Auth | Appwrite Auth (email + password) |
 
-## 💡 Additional notes
-- This starter project is designed to streamline your Next.js development with Appwrite.
-- Refer to the [Appwrite documentation](https://appwrite.io/docs) for detailed integration guidance.
+Bootstrapped from the open-source
+[appwrite/starter-for-nextjs](https://github.com/appwrite/starter-for-nextjs) (MIT).
+
+## Running locally
+
+```bash
+cp .env.example .env.local   # then add APPWRITE_API_KEY (server only)
+npm install
+npm run dev
+```
+
+Open http://localhost:3000. The browser console logs `[appwrite] ping ok` once the
+client reaches your project.
+
+## Checks
+
+```bash
+npm run typecheck
+npm run build
+```
