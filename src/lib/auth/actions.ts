@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { AppwriteException, ID } from "node-appwrite";
 import { createAdminClient, createSessionClient } from "@/lib/appwrite/server";
-import { SESSION_COOKIE, safeNext } from "@/lib/auth/constants";
+import { HOME_PATH, SESSION_COOKIE, safeNext } from "@/lib/auth/constants";
 
 export type AuthFormState = {
   error?: string;
@@ -77,7 +77,7 @@ export async function signUp(_prev: AuthFormState, form: FormData): Promise<Auth
   } catch (err) {
     return { error: describe(err), fields };
   }
-  redirect("/");
+  redirect(HOME_PATH);
 }
 
 export async function signIn(_prev: AuthFormState, form: FormData): Promise<AuthFormState> {

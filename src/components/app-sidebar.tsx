@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { Inbox } from "lucide-react";
 import { AccountMenu, type AccountSummary } from "@/components/account-menu";
 import { Brand } from "@/components/brand";
+import { HOME_PATH } from "@/lib/auth/constants";
 import {
   Sidebar,
   SidebarContent,
@@ -18,7 +19,7 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar";
 
-const NAV = [{ href: "/", label: "Requests", icon: Inbox }];
+const NAV = [{ href: HOME_PATH, label: "Requests", icon: Inbox }];
 
 export function AppSidebar({ account }: Readonly<{ account: AccountSummary }>) {
   const pathname = usePathname();
@@ -28,7 +29,7 @@ export function AppSidebar({ account }: Readonly<{ account: AccountSummary }>) {
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" render={<Link href="/" />}>
+            <SidebarMenuButton size="lg" render={<Link href={HOME_PATH} />}>
               <Brand />
             </SidebarMenuButton>
           </SidebarMenuItem>
