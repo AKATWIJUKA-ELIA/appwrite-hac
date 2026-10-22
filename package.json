@@ -4,10 +4,11 @@
   "private": true,
   "description": "A procurement agent on Appwrite: state a need, it finds suppliers, emails them for real quotes, reads the replies, and compares them.",
   "scripts": {
-    "dev": "next dev",
+    "dev": "NODE_OPTIONS=--dns-result-order=ipv4first next dev",
     "build": "next build",
-    "start": "next start",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "start": "NODE_OPTIONS=--dns-result-order=ipv4first next start",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "db:setup": "NODE_OPTIONS=--dns-result-order=ipv4first tsx --env-file=.env.local scripts/setup-db.ts"
   },
   "dependencies": {
     "@babel/runtime": "^7.29.10",
