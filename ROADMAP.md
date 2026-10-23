@@ -110,21 +110,28 @@ Each phase ends with something you can click through. Don't start the next phase
       the shared `TrackBadge`)
 - [x] `after()` verified locally on `next dev` and `next start`: the probe row lands 20 s
       after the response
-- [ ] **Deploy the skeleton** (D1) and set the env vars on the host
-- [ ] On the host, prove that work inside `after()` keeps running once the response is sent
-      (a test route that writes an event 20 s later). Serverless hosts can freeze it; if this
-      one does, the steps run in an Appwrite Function from Phase 1 instead of in `after()`.
+- [x] **Deploy the skeleton** (D1): Appwrite Sites, https://quotebook.appwrite.network,
+      SSR adapter (the site was first created as `static`, which 404s every route), all env
+      vars set. Site request timeout is 30 s.
+- [x] On the host, prove that work inside `after()` keeps running once the response is sent:
+      the probe row landed 20 s after the response (23 Oct, 13:00:49 UTC).
+- [ ] Before Phase 2: probe a run longer than the 30 s timeout. Discovery can take 30–60 s;
+      if `after()` work is cut at 30 s, split discovery into one step per candidate or raise
+      the site timeout.
 
 **Done when**: the deployed app signs in, `/api/cron/tick` answers 200 with the secret
 and 401 without it, and the `after()` test row appears.
 
 ### Phase 1: Request and extraction · Sat 24 Oct
-- [ ] Port `request-form.tsx` as a server action `createRequest` that writes the request, then `after(extract)`
-- [ ] `extract` step: port `intake.extractSpec` and save the spec plus line items in one transaction
-- [ ] `/requests/[id]` page: header, line items, pipeline progress, timeline, failure banner with Retry
-- [ ] Sidebar history (port `sidebar.tsx`) and the `/requests` list
-- [ ] `retryRequest`: resume at extraction or discovery, depending on where it died
-- [ ] Live refresh while the status is `extracting`, `discovering` or `collecting` (D2)
+- [x] Port `request-form.tsx` as a server action `createRequest` that writes the request, then `after(extract)`
+- [x] `extract` step: port `intake.extractSpec` and save the spec plus line items in one transaction
+      (verified 23 Oct: the Dell text gives 1 item, UGX 180,000,000, 14 days; gpt-5 took 17.7 s)
+- [x] `/requests/[id]` page: header, line items, pipeline progress, timeline, failure banner with Retry
+      (verified: owner sees it, a second account gets "That request no longer exists")
+- [x] Sidebar history (port `sidebar.tsx`); `/requests` is now the new-request form
+- [x] `retryRequest`: resume at extraction or discovery, depending on where it died
+- [x] Live refresh while the status is `extracting`, `discovering` or `collecting` (D2)
+- [ ] Click-through in a browser: submit the form, watch it fill in, Retry a failed request
 
 **Done when**: typing *"50 × Dell Latitude 5550, i7/16GB/512GB, delivered to Kampala within
 14 days, budget UGX 180,000,000"* shows 1 line item, a UGX 180,000,000 budget and a 14-day

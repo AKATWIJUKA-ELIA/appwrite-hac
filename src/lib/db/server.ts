@@ -17,6 +17,16 @@ export function db() {
   return createAdminClient().tablesDB;
 }
 
+/**
+ * Strip what the SDK adds to response objects (a hidden `toString` method) so
+ * the data can be passed from a server component to a client component, which
+ * React only allows for plain objects. Values stay numbers: every integer we
+ * store is far inside the safe range, so nothing comes back as a BigInt.
+ */
+export function plain<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
 export const isNotFound = (err: unknown) => err instanceof AppwriteException && err.code === 404;
 export const isConflict = (err: unknown) => err instanceof AppwriteException && err.code === 409;
 
@@ -78,6 +88,28 @@ export async function recordEvent(args: {
     permissions: args.ownerId ? ownerPermissions(args.ownerId) : [],
     transactionId: args.transactionId,
   });
+}
+
+/**
+ * Run several writes as one TablesDB transaction: every createRow/updateRow
+ * inside `work` passes the given `transactionId`, and they all commit together
+ * or are rolled back together if anything throws.
+ */
+export async function withTransaction<T>(work: (transactionId: string) => Promise<T>): Promise<T> {
+  const tables = db();
+  const { $id: transactionId } = await tables.createTransaction();
+  try {
+    const result = await work(transactionId);
+    await tables.updateTransaction({ transactionId, commit: true });
+    return result;
+  } catch (err) {
+    await tables.updateTransaction({ transactionId, rollback: true }).catch((rollbackErr) => {
+      // A failed rollback expires on Appwrite's side; the original error is
+      // the one worth surfacing.
+      console.error("[db] rollback failed", rollbackErr);
+    });
+    throw err;
+  }
 }
 
 /** Turn any thrown value into the `{ error }` a server action returns. */

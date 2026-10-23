@@ -1,8 +1,16 @@
 import "server-only";
 
 import { after } from "next/server";
-import { recordEvent, db } from "@/lib/db/server";
+import { recordEvent, db, UserFacingError } from "@/lib/db/server";
 import { DATABASE_ID, TABLES } from "@/lib/db/schema";
+
+export type Step = "extract" | "discover";
+
+// How a failure reads on the request page: "Extraction failed: <cause>".
+const STEP_LABEL: Record<Step, string> = {
+  extract: "Extraction",
+  discover: "Supplier search",
+};
 
 // Replaces Convex's scheduler and workflow component. The request's status is
 // the queue: each step reads it, does one job, and moves it on. A step runs
@@ -16,7 +24,7 @@ import { DATABASE_ID, TABLES } from "@/lib/db/schema";
  * throw marks the request failed rather than disappearing into a log.
  */
 export function runStep(
-  step: string,
+  step: Step,
   request: { id: string; ownerId: string },
   work: () => Promise<void>,
 ): void {
@@ -30,18 +38,21 @@ export function runStep(
 }
 
 export async function markRequestFailed(
-  step: string,
+  step: Step,
   request: { id: string; ownerId: string },
   err: unknown,
 ): Promise<void> {
-  const reason = err instanceof Error ? err.message : String(err);
-  console.error(`[step:${step}] request ${request.id} failed:`, reason);
+  const cause = err instanceof Error ? err.message : String(err);
+  // A UserFacingError is already a sentence for the buyer; anything else is a
+  // technical cause, named by the step it broke.
+  const reason = err instanceof UserFacingError ? cause : `${STEP_LABEL[step]} failed: ${cause}`;
+  console.error(`[step:${step}] request ${request.id} failed:`, cause);
   try {
     await db().updateRow({
       databaseId: DATABASE_ID,
       tableId: TABLES.requests.id,
       rowId: request.id,
-      data: { status: "failed", failureReason: `${step}: ${reason}`.slice(0, 2000) },
+      data: { status: "failed", failureReason: reason.slice(0, 2000) },
     });
     await recordEvent({
       requestId: request.id,
