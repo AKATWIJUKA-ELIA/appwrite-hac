@@ -21,6 +21,12 @@ import {
   UserFacingError,
   withTransaction,
 } from "@/lib/db/server";
+import {
+  contactPageUrl,
+  harvestEmails,
+  isOwnDomain,
+  pickContactEmail,
+} from "@/lib/server/contact-emails";
 import { firecrawl } from "@/lib/server/firecrawl";
 import { fetchUsdRates } from "@/lib/server/fx";
 import { verifyEmailMx, type MxVerification } from "@/lib/server/mx";
@@ -36,6 +42,10 @@ const MAX_CANDIDATES = 4;
 // deadline is dropped rather than holding the whole board back.
 const CANDIDATE_DEADLINE_MS = 15_000;
 const SCRAPE_TIMEOUT_MS = 10_000;
+
+// One line per failed site. A dead or slow supplier page is routine during
+// discovery, and the SDK's full error object buries the log.
+const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
 /** Resolves to null if `work` has not settled within `ms`. */
 function withDeadline<T>(work: Promise<T>, ms: number): Promise<T | null> {
@@ -62,6 +72,8 @@ type Enriched = {
   websiteUrl: string;
   sourceUrl: string;
   email?: string;
+  /** The page the address was found on, kept with the contact for audit. */
+  emailSourceUrl?: string;
   priceAmount?: number;
   currency?: string;
 };
@@ -185,20 +197,51 @@ async function snapshotFx(): Promise<Record<string, FxSnapshot>> {
  * is a normal outcome, not an error.
  */
 async function enrichCandidate(candidate: Candidate, items: LineItemRow[]): Promise<Enriched | null> {
+  const startedAt = Date.now();
   let markdown = "";
+  let links: string[] = [];
   try {
     const page = await firecrawl().scrape(candidate.url, {
-      formats: ["markdown"],
+      // Links carry mailto: addresses and the way to the contact page.
+      formats: ["markdown", "links"],
       onlyMainContent: true,
       maxAge: 3_600_000,
       timeout: SCRAPE_TIMEOUT_MS,
     });
     markdown = page.markdown ?? "";
+    links = page.links ?? [];
   } catch (error) {
-    console.error(`[discover] scrape failed for ${candidate.url}`, error);
+    console.error(`[discover] scrape failed for ${candidate.url}: ${errorText(error)}`);
     return null;
   }
   if (!markdown) return null;
+
+  // Product pages rarely carry an address; the site's contact page or footer
+  // usually does. When this page has none of the supplier's own, fetch the
+  // contact page while the model reads the product page, so it costs no
+  // extra time on the critical path.
+  const onPage = harvestEmails([markdown], links);
+  const ownOnPage = onPage.filter((email) => isOwnDomain(email, candidate.domain));
+  const contactUrl =
+    ownOnPage.length > 0 ? null : contactPageUrl(candidate.url, links, candidate.domain);
+  const contactPage: Promise<{ emails: string[]; url: string } | null> = contactUrl
+    ? firecrawl()
+        .scrape(contactUrl, {
+          formats: ["markdown", "links"],
+          // The footer is the point here, so keep the whole page.
+          onlyMainContent: false,
+          maxAge: 86_400_000,
+          timeout: SCRAPE_TIMEOUT_MS,
+        })
+        .then((page) => ({
+          emails: harvestEmails([page.markdown ?? ""], page.links ?? []),
+          url: contactUrl,
+        }))
+        .catch((error: unknown) => {
+          console.error(`[discover] contact page failed for ${contactUrl}: ${errorText(error)}`);
+          return null;
+        })
+    : Promise.resolve(null);
 
   const wanted = items.map((item) => `${item.quantity} x ${item.description}`).join("; ");
   const apiKey = process.env.OPENAI_API_KEY;
@@ -227,10 +270,19 @@ async function enrichCandidate(candidate: Candidate, items: LineItemRow[]): Prom
       }),
     });
 
-    const email =
-      typeof extracted.email === "string" && extracted.email.includes("@")
-        ? extracted.email.trim().toLowerCase()
-        : undefined;
+    // Give the contact page whatever is left of this candidate's deadline,
+    // keeping a margin for the write that follows.
+    const remaining = CANDIDATE_DEADLINE_MS - 1_500 - (Date.now() - startedAt);
+    const fromContactPage = remaining > 0 ? await withDeadline(contactPage, remaining) : null;
+
+    const modelEmail = typeof extracted.email === "string" ? harvestEmails([extracted.email], []) : [];
+    const pageEmails = [...onPage, ...modelEmail];
+    const contactEmails = fromContactPage?.emails ?? [];
+    // Own-domain addresses win wherever they were found; anything else only
+    // when the site offers nothing of its own.
+    const email = pickContactEmail([...pageEmails, ...contactEmails], candidate.domain);
+    const emailSourceUrl =
+      email && !pageEmails.includes(email) && fromContactPage ? fromContactPage.url : candidate.url;
 
     return {
       domain: candidate.domain,
@@ -241,6 +293,7 @@ async function enrichCandidate(candidate: Candidate, items: LineItemRow[]): Prom
       websiteUrl: candidate.url,
       sourceUrl: candidate.url,
       email,
+      emailSourceUrl,
       priceAmount:
         typeof extracted.priceAmount === "number" && extracted.priceAmount > 0
           ? extracted.priceAmount
@@ -251,7 +304,7 @@ async function enrichCandidate(candidate: Candidate, items: LineItemRow[]): Prom
           : undefined,
     };
   } catch (error) {
-    console.error(`[discover] extraction failed for ${candidate.url}`, error);
+    console.error(`[discover] extraction failed for ${candidate.url}: ${errorText(error)}`);
     return null;
   }
 }
@@ -323,7 +376,7 @@ async function ensureContact(
         role: null,
         verification,
         verifiedAt: new Date().toISOString(),
-        sourceUrl: supplier.sourceUrl,
+        sourceUrl: supplier.emailSourceUrl ?? supplier.sourceUrl,
       },
     });
   } catch (err) {

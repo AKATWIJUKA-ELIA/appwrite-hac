@@ -1,7 +1,7 @@
 "use client";
 
-import { ExternalLink, Info, Search, Trophy } from "lucide-react";
-import { TrackBadge } from "@/components/status-badge";
+import { ExternalLink, Info, Mail, MailX, Search, Trophy } from "lucide-react";
+import { TrackBadge, VerificationBadge } from "@/components/status-badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -104,6 +104,23 @@ export function Board({ rows }: Readonly<{ rows: BoardRow[] }>) {
                                       <ExternalLink className="size-3" />
                                     </a>
                                   )}
+                                </div>
+                              )}
+                              {row.contactEmail ? (
+                                <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs">
+                                  <Mail className="size-3 shrink-0 text-muted-foreground" />
+                                  <span className="font-mono break-all">{row.contactEmail}</span>
+                                  {row.contactVerification && (
+                                    <VerificationBadge
+                                      verification={row.contactVerification}
+                                      className="px-1.5 py-0 text-[10px]"
+                                    />
+                                  )}
+                                </div>
+                              ) : (
+                                <div className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground/80">
+                                  <MailX className="size-3 shrink-0" />
+                                  No address found — add one when you approve
                                 </div>
                               )}
                             </div>

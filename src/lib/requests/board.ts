@@ -1,8 +1,8 @@
 import "server-only";
 
 import { Query } from "node-appwrite";
-import type { QuoteRow, RfqRow, SupplierRow } from "@/lib/db/rows";
-import { DATABASE_ID, TABLES, type RfqStatus } from "@/lib/db/schema";
+import type { ContactRow, QuoteRow, RfqRow, SupplierRow } from "@/lib/db/rows";
+import { DATABASE_ID, TABLES, type ContactVerification, type RfqStatus } from "@/lib/db/schema";
 import { db } from "@/lib/db/server";
 import type { BoardTrack } from "@/lib/vocabulary";
 
@@ -24,6 +24,9 @@ export type BoardRow = {
   sourceUrl: string | null;
   quoteId: string | null;
   rfqStatus: RfqStatus | null;
+  /** Where the RFQ goes: found by discovery, or typed in at the send gate. */
+  contactEmail: string | null;
+  contactVerification: ContactVerification | null;
 };
 
 /**
@@ -65,18 +68,33 @@ export async function loadBoard(requestId: string): Promise<BoardRow[]> {
   const supplierIds = [...new Set([...best.keys(), ...rfqs.rows.map((rfq) => rfq.supplierId)])];
   if (supplierIds.length === 0) return [];
 
-  const suppliers = await tables.listRows<SupplierRow>({
-    databaseId: DATABASE_ID,
-    tableId: TABLES.suppliers.id,
-    queries: [Query.equal("$id", supplierIds), Query.limit(supplierIds.length)],
-    total: false,
-  });
+  const [suppliers, contacts] = await Promise.all([
+    tables.listRows<SupplierRow>({
+      databaseId: DATABASE_ID,
+      tableId: TABLES.suppliers.id,
+      queries: [Query.equal("$id", supplierIds), Query.limit(supplierIds.length)],
+      total: false,
+    }),
+    tables.listRows<ContactRow>({
+      databaseId: DATABASE_ID,
+      tableId: TABLES.contacts.id,
+      queries: [Query.equal("supplierId", supplierIds), Query.limit(100)],
+      total: false,
+    }),
+  ]);
   const supplierById = new Map(suppliers.rows.map((s) => [s.$id, s]));
+  const contactById = new Map(contacts.rows.map((c) => [c.$id, c]));
+  // The address the RFQ draft points at; failing that, the supplier's first.
+  const contactFor = (supplierId: string, rfq: RfqRow | null) =>
+    (rfq?.contactId ? contactById.get(rfq.contactId) : undefined) ??
+    contacts.rows.find((c) => c.supplierId === supplierId) ??
+    null;
 
   const rows: BoardRow[] = supplierIds.map((supplierId) => {
     const supplier = supplierById.get(supplierId);
     const quote = best.get(supplierId) ?? null;
     const rfq = rfqBySupplier.get(supplierId) ?? null;
+    const contact = contactFor(supplierId, rfq);
 
     return {
       supplierId,
@@ -105,6 +123,8 @@ export async function loadBoard(requestId: string): Promise<BoardRow[]> {
       sourceUrl: quote?.sourceUrl ?? null,
       quoteId: quote?.$id ?? null,
       rfqStatus: rfq?.status ?? null,
+      contactEmail: contact?.email ?? null,
+      contactVerification: contact?.verification ?? null,
     };
   });
 
