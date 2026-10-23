@@ -14,9 +14,10 @@ import {
 } from "lucide-react";
 import { Brand } from "@/components/brand";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { TrackBadge, type Track } from "@/components/track-badge";
+import { TrackBadge } from "@/components/status-badge";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import type { BoardTrack } from "@/lib/vocabulary";
 
 export const metadata: Metadata = {
   title: "Quotebook · procurement, answered",
@@ -74,19 +75,19 @@ const FEATURES = [
 
 // The hero's sample board, for the same Dell request. Suppliers are made up;
 // the recommendation's numbers are worked from these rows and the UGX 180M budget.
-const HERO_BOARD: { supplier: string; track: Track; total?: string; lead?: string }[] = [
+const HERO_BOARD: { supplier: string; track: BoardTrack; total?: string; lead?: string }[] = [
   { supplier: "Kampala Office Tech", track: "confirmed", total: "171,500,000", lead: "10 days" },
   { supplier: "EastLink Distributors", track: "confirmed", total: "176,000,000", lead: "7 days" },
-  { supplier: "Marketplace listing", track: "web", total: "168,250,000" },
+  { supplier: "Marketplace listing", track: "web price", total: "168,250,000" },
   { supplier: "Nile IT Supplies", track: "awaiting" },
 ];
 
 // Illustrative rows for the preview board. Suppliers are made up.
-const PREVIEW: { supplier: string; track: Track; total?: string; lead?: string }[] = [
+const PREVIEW: { supplier: string; track: BoardTrack; total?: string; lead?: string }[] = [
   { supplier: "Lakeside Computers Ltd", track: "confirmed", total: "171,500,000", lead: "10 days" },
-  { supplier: "Nile Office Systems", track: "web", total: "176,250,000", lead: "—" },
+  { supplier: "Nile Office Systems", track: "web price", total: "176,250,000", lead: "—" },
   { supplier: "Entebbe Tech Traders", track: "awaiting" },
-  { supplier: "Pearl Business Machines", track: "none" },
+  { supplier: "Pearl Business Machines", track: "no price" },
 ];
 
 export default function LandingPage() {
@@ -215,7 +216,7 @@ export default function LandingPage() {
               seconds; confirmed quotes from real replies replace them as they arrive.
             </p>
             <div className="mt-2 flex flex-wrap gap-2">
-              {(["confirmed", "web", "awaiting", "none"] as const).map((t) => (
+              {(["confirmed", "web price", "awaiting", "no price"] as const).map((t) => (
                 <TrackBadge key={t} track={t} />
               ))}
             </div>

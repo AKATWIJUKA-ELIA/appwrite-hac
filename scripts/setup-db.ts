@@ -16,7 +16,6 @@ import {
   TablesDBIndexType,
 } from "node-appwrite";
 import { DATABASE_ID, TABLES, type ColumnSpec, type TableSpec } from "../src/lib/db/schema";
-
 const endpoint = process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT;
 const project = process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID;
 const key = process.env.APPWRITE_API_KEY;
