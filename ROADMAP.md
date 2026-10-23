@@ -138,14 +138,19 @@ and 401 without it, and the `after()` test row appears.
 window without a manual reload.
 
 ### Phase 2: Discovery and the board · Sun 25 Oct
-- [ ] Add `@mendable/firecrawl-js`; port `searchCandidates` and `enrichCandidate`
-      (`Promise.allSettled`, at most 4 candidates)
-- [ ] FX snapshot once per run; MX check per address
-- [ ] `writeCandidate` in one transaction. The supplier is deduped by its unique `domain`,
-      so a 409 means "use the existing row". The step also writes the contact, the
-      web-price quote and the RFQ draft.
-- [ ] Finish: status becomes `awaiting_approval` and an event is recorded. Cancel button.
-- [ ] Port `board.forRequest` (one row per supplier, emailed beats crawled) and `board.tsx`
+- [x] Add `@mendable/firecrawl-js`; port `searchCandidates` and `enrichCandidate`
+      (`Promise.allSettled`, at most 4 candidates). Search no longer asks Firecrawl to
+      scrape (the content was never used); each candidate has a 15 s deadline.
+- [x] FX snapshot once per run; MX check per address
+- [x] `writeCandidate`: supplier and contact upserted first (shared, unique-indexed),
+      then the web-price quote, RFQ draft and event in one transaction
+- [x] Finish: status becomes `awaiting_approval` and an event is recorded. Stop search button.
+      Zero suppliers now fails with a Retry message instead of an empty approval screen.
+- [x] Port `board.forRequest` (one row per supplier, emailed beats crawled) and `board.tsx`
+- [x] gpt-5 `reasoning_effort: "low"` for extraction and page reading (measured: 19.9 s →
+      5.5 s per page, same answer). Full Dell run: 21 s, 4 real suppliers, ends at approval.
+- [ ] After the next deploy: `POST /api/cron/probe?seconds=45` on the live site, to learn
+      whether `after()` work outlives the 30 s site timeout
 
 **Done when**: a request reaches "Your approval" with suppliers on the board, and at least
 one has a web price.

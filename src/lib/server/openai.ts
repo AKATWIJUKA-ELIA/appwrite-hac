@@ -96,6 +96,12 @@ export async function openAiJson(args: {
   user: string;
   schemaName: string;
   schema: JsonSchema;
+  /**
+   * How long gpt-5 thinks before answering. Lower is faster and cheaper; the
+   * pipeline runs inside a 30-second host request, so simple extractions
+   * should not pay for deep reasoning. Omitted means the model's default.
+   */
+  reasoningEffort?: "minimal" | "low" | "medium" | "high";
 }): Promise<Record<string, unknown>> {
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
@@ -106,6 +112,7 @@ export async function openAiJson(args: {
     body: JSON.stringify({
       model: args.model,
       max_completion_tokens: MAX_OUTPUT_TOKENS,
+      ...(args.reasoningEffort ? { reasoning_effort: args.reasoningEffort } : {}),
       messages: [
         { role: "system", content: args.system },
         { role: "user", content: clip(args.user) },

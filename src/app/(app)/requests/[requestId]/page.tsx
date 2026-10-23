@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft, FileQuestion } from "lucide-react";
+import { Board } from "@/components/requests/board";
 import { LiveRefresh } from "@/components/requests/live-refresh";
 import { RequestHeader } from "@/components/requests/request-header";
 import { Timeline } from "@/components/requests/timeline";
@@ -29,13 +30,14 @@ export default async function RequestPage({
     if (err instanceof UserFacingError) return <RequestNotFound />;
     throw err;
   }
-  const { request, lineItems, events } = detail;
+  const { request, lineItems, events, board } = detail;
+  const confirmedCount = board.filter((row) => row.track === "confirmed").length;
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-4">
       <LiveRefresh active={IN_FLIGHT.includes(request.status)} />
-      {/* Confirmed-quote count comes from the board, which arrives in Phase 2. */}
-      <RequestHeader request={request} lineItems={lineItems} confirmedCount={0} />
+      <RequestHeader request={request} lineItems={lineItems} confirmedCount={confirmedCount} />
+      <Board rows={board} />
       <Timeline events={events} />
     </div>
   );

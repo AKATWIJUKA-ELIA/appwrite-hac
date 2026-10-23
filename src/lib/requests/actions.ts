@@ -14,7 +14,7 @@ import {
   requireOwnedRequest,
   UserFacingError,
 } from "@/lib/db/server";
-import { startDiscovery } from "@/lib/pipeline/discovery";
+import { discover } from "@/lib/pipeline/discovery";
 import { extractSpec } from "@/lib/pipeline/extract";
 import { runStep } from "@/lib/server/jobs";
 
@@ -120,10 +120,40 @@ export async function retryRequest(requestId: string): Promise<{ error?: string 
     });
 
     if (extracted) {
-      runStep("discover", owner, () => startDiscovery({ ...request, status: "discovering" }));
+      runStep("discover", owner, () => discover(requestId));
     } else {
       runStep("extract", owner, () => extractSpec(requestId));
     }
+  } catch (err) {
+    return actionError(err);
+  }
+  revalidatePath(`/requests/${requestId}`);
+  return {};
+}
+
+/**
+ * Stop an in-flight supplier search. Every remaining candidate costs a scrape
+ * and a model call, so this is the switch that bounds a run going wrong. The
+ * running search checks the status before each write and stops on its own.
+ */
+export async function cancelDiscovery(requestId: string): Promise<{ error?: string }> {
+  try {
+    const { request } = await requireOwnedRequest(requestId);
+    if (request.status !== "discovering") {
+      throw new UserFacingError("Supplier search is not running for this request.");
+    }
+    await db().updateRow({
+      databaseId: DATABASE_ID,
+      tableId: TABLES.requests.id,
+      rowId: requestId,
+      data: { status: "failed", failureReason: "Discovery cancelled." },
+    });
+    await recordEvent({
+      requestId,
+      ownerId: request.userId,
+      kind: "discovery.cancelled",
+      message: "Discovery cancelled before it finished.",
+    });
   } catch (err) {
     return actionError(err);
   }

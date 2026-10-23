@@ -3,7 +3,15 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { AlertTriangle, CalendarClock, Loader2, MapPin, RotateCcw, Wallet } from "lucide-react";
+import {
+  AlertTriangle,
+  CalendarClock,
+  Loader2,
+  MapPin,
+  RotateCcw,
+  Square,
+  Wallet,
+} from "lucide-react";
 import { PipelineProgress } from "@/components/requests/pipeline-progress";
 import { StatusBadge } from "@/components/status-badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -11,7 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import type { LineItemRow, RequestRow } from "@/lib/db/rows";
 import { formatMoney } from "@/lib/format";
-import { retryRequest } from "@/lib/requests/actions";
+import { cancelDiscovery, retryRequest } from "@/lib/requests/actions";
 
 // The extractor sometimes files a delivery or commercial fact under `specs`.
 // Those already have their own cards, and showing "deliveryLocation: Kampala"
@@ -65,7 +73,10 @@ export function RequestHeader({
           </div>
         </div>
 
-        <PipelineProgress status={request.status} />
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <PipelineProgress status={request.status} />
+          {request.status === "discovering" && <StopSearch requestId={request.$id} />}
+        </div>
 
         {request.status === "failed" && (
           <RetryRequest
@@ -160,6 +171,34 @@ function Fact({
         {value}
       </dd>
     </div>
+  );
+}
+
+/**
+ * Stop a supplier search that is going wrong (the wrong product, say) rather
+ * than paying for every remaining scrape. Retry starts it again afterwards.
+ */
+function StopSearch({ requestId }: Readonly<{ requestId: string }>) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+
+  function run() {
+    startTransition(async () => {
+      const result = await cancelDiscovery(requestId);
+      if (result.error) {
+        toast.error(result.error);
+        return;
+      }
+      toast.success("Supplier search stopped.");
+      router.refresh();
+    });
+  }
+
+  return (
+    <Button variant="outline" size="sm" onClick={run} disabled={pending}>
+      {pending ? <Loader2 className="animate-spin" /> : <Square />}
+      Stop search
+    </Button>
   );
 }
 

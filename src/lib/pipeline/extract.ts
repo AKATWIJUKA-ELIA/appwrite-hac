@@ -11,7 +11,8 @@ import {
   UserFacingError,
   withTransaction,
 } from "@/lib/db/server";
-import { startDiscovery } from "@/lib/pipeline/discovery";
+import { discover } from "@/lib/pipeline/discovery";
+import { markRequestFailed } from "@/lib/server/jobs";
 import {
   EXTRACTION_MODEL,
   nullable,
@@ -49,6 +50,9 @@ export async function extractSpec(requestId: string): Promise<void> {
   const spec = await openAiJson({
     apiKey,
     model: EXTRACTION_MODEL,
+    // Default effort took ~18 s on the Dell request; extraction and discovery
+    // share one 30-second host request, so keep the thinking short.
+    reasoningEffort: "low",
     system:
       "You extract IT-equipment procurement requirements. Return only what the text states. " +
       "Never invent a budget, quantity, or delivery window that is not present.",
@@ -113,7 +117,13 @@ export async function extractSpec(requestId: string): Promise<void> {
     items,
   });
 
-  await startDiscovery(request);
+  // Discovery runs straight on in the same background job. Its failures are
+  // its own: recorded as "Supplier search failed", not as an extraction error.
+  try {
+    await discover(request.$id);
+  } catch (err) {
+    await markRequestFailed("discover", { id: request.$id, ownerId: request.userId }, err);
+  }
 }
 
 /**
