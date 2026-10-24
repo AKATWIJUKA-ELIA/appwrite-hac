@@ -4,6 +4,7 @@ import { ArrowLeft, FileQuestion } from "lucide-react";
 import { Board } from "@/components/requests/board";
 import { LiveRefresh } from "@/components/requests/live-refresh";
 import { RequestHeader } from "@/components/requests/request-header";
+import { ReviewQueue } from "@/components/requests/review-queue";
 import { SendGate } from "@/components/requests/send-gate";
 import { Timeline } from "@/components/requests/timeline";
 import { buttonVariants } from "@/components/ui/button";
@@ -38,7 +39,7 @@ export default async function RequestPage({
     if (err instanceof UserFacingError) return <RequestNotFound />;
     throw err;
   }
-  const { request, lineItems, events, board, recipients } = detail;
+  const { request, lineItems, events, board, recipients, held } = detail;
   const confirmedCount = board.filter((row) => row.track === "confirmed").length;
 
   return (
@@ -50,6 +51,9 @@ export default async function RequestPage({
       />
       <RequestHeader request={request} lineItems={lineItems} confirmedCount={confirmedCount} />
       <Board rows={board} />
+      {/* Held replies sit directly under the board: they are the reason a row
+          still reads "awaiting" when a supplier has in fact written back. */}
+      <ReviewQueue held={held} />
       {/* Hidden while discovery is still adding suppliers, so nobody approves
           a list that is about to change under them. */}
       {request.status !== "discovering" && request.status !== "extracting" && (

@@ -172,13 +172,22 @@ one has a web price.
 **Done when**: an RFQ lands in your demo mailbox (D3), and its row shows *Awaiting reply*.
 
 ### Phase 4: Replies · Tue 27 Oct
-- [ ] Webhook route: Svix verification on the raw body; insert into `inboundParses` and
+- [x] Webhook route: Svix verification on the raw body; insert into `inboundParses` and
       treat a 409 on `eventId` as already handled. Unauthenticated senders are held for review.
-- [ ] Port `matchRfq` (by thread, then by sender domain) and `singleOutstandingRequest`
-- [ ] `parse` step: OpenAI quote parse, then `applyParsedQuote` in one transaction
+      Mail from our own inbox is ignored; the parser reads AgentMail's `extracted_text`.
+- [x] Port `matchRfq` (by thread, then by sender domain, sent/replied RFQs only) and
+      `singleOutstandingRequest`
+- [x] `parse` step: OpenAI quote parse, then `applyParsedQuote` in one transaction
       (insert the emailed quote, mark the crawled one `supersededBy`)
-- [ ] Port `review-queue.tsx` with `releaseForParsing` and `linkToRfq`
-- [ ] Point the AgentMail webhook at `https://<host>/api/webhooks/agentmail`
+- [x] Port `review-queue.tsx` with `releaseForParsing` and `linkToRfq`; release and link
+      only from a finished state, and a reply never produces two quotes
+- [x] Verified 24 Oct with signed test deliveries: bad signature 401; own mail, duplicates
+      and other event types ignored; quote reply → confirmed UGX 171,500,000 / VAT / 10 days /
+      12 months with the web price superseded; unauthenticated held; out-of-office → not a
+      quote; stranger → held; release refused for another user
+- [ ] `linkToRfq` not exercised end to end (needs a request with exactly one waiting RFQ)
+- [ ] Point the AgentMail webhook at `https://<host>/api/webhooks/agentmail` (after deploy;
+      the existing webhook targets the old URL and is disabled)
 
 **Done when**: you reply "Total UGX 171,500,000 incl. VAT, 10 days, 12 months warranty"
 from the demo mailbox, and the row flips to *Confirmed* with those numbers.
