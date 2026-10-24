@@ -67,3 +67,72 @@ export async function sendMessage(args: {
 function stripUndefined(input: Record<string, unknown>): Record<string, unknown> {
   return Object.fromEntries(Object.entries(input).filter(([, value]) => value !== undefined));
 }
+
+export type ThreadMessage = {
+  messageId: string;
+  from: string;
+  to: string[];
+  sentAt: string;
+  /** "out" for mail we sent, "in" for mail the supplier sent. */
+  direction: "in" | "out";
+  /** The message without the quoted history underneath, when AgentMail could separate it. */
+  text: string;
+};
+
+/** Every message on a thread, oldest first. */
+export async function getThread(
+  inboxId: string,
+  threadId: string,
+): Promise<{ messages: ThreadMessage[]; lastMessageId: string | null }> {
+  const { apiKey, baseUrl } = config();
+  const response = await fetch(
+    `${baseUrl}/inboxes/${encodeURIComponent(inboxId)}/threads/${encodeURIComponent(threadId)}`,
+    { headers: { Authorization: `Bearer ${apiKey}` }, cache: "no-store" },
+  );
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`AgentMail ${response.status}: ${detail.slice(0, 200)}`);
+  }
+  const body = (await response.json()) as Record<string, unknown>;
+  const raw = Array.isArray(body.messages) ? (body.messages as Record<string, unknown>[]) : [];
+  const str = (v: unknown) => (typeof v === "string" ? v : "");
+  const messages = raw.map((m) => ({
+    messageId: str(m.message_id),
+    from: str(m.from),
+    to: Array.isArray(m.to) ? m.to.filter((t): t is string => typeof t === "string") : [],
+    sentAt: str(m.timestamp),
+    direction: (Array.isArray(m.labels) && m.labels.includes("sent") ? "out" : "in") as "in" | "out",
+    text: str(m.extracted_text) || str(m.text),
+  }));
+  messages.sort((a, b) => a.sentAt.localeCompare(b.sentAt));
+  const last = str(body.last_message_id) || messages.at(-1)?.messageId || null;
+  return { messages, lastMessageId: last };
+}
+
+/**
+ * Reply to a message, so the recipient sees it threaded under the email they
+ * sent rather than as a new conversation.
+ */
+export async function replyToMessage(args: {
+  inboxId: string;
+  messageId: string;
+  text: string;
+}): Promise<{ messageId?: string; threadId?: string }> {
+  const { apiKey, baseUrl } = config();
+  const path = `/inboxes/${encodeURIComponent(args.inboxId)}/messages/${encodeURIComponent(args.messageId)}/reply`;
+  const response = await fetch(`${baseUrl}${path}`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ text: args.text }),
+  });
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`AgentMail ${response.status}: ${detail.slice(0, 200)}`);
+  }
+  const body: unknown = await response.json().catch(() => null);
+  const record = (typeof body === "object" && body !== null ? body : {}) as Record<string, unknown>;
+  return {
+    messageId: typeof record.message_id === "string" ? record.message_id : undefined,
+    threadId: typeof record.thread_id === "string" ? record.thread_id : undefined,
+  };
+}

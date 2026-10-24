@@ -23,6 +23,7 @@ export type BoardRow = {
   warrantyMonths: number | null;
   sourceUrl: string | null;
   quoteId: string | null;
+  rfqId: string | null;
   rfqStatus: RfqStatus | null;
   /** Where the RFQ goes: found by discovery, or typed in at the send gate. */
   contactEmail: string | null;
@@ -139,6 +140,7 @@ export async function loadBoard(requestId: string): Promise<BoardRow[]> {
       warrantyMonths: quote?.warrantyMonths ?? null,
       sourceUrl: quote?.sourceUrl ?? null,
       quoteId: quote?.$id ?? null,
+      rfqId: rfq?.$id ?? null,
       rfqStatus: rfq?.status ?? null,
       contactEmail: contact?.email ?? null,
       contactVerification: contact?.verification ?? null,

@@ -193,8 +193,13 @@ one has a web price.
 from the demo mailbox, and the row flips to *Confirmed* with those numbers.
 
 ### Phase 5: Decision, chasing and live updates · Wed 28 Oct
-- [ ] Port `recommendations.compute` as is (arithmetic picks, model writes the sentence)
-      and `recommendation.tsx`
+- [x] Port `recommendations.compute` (arithmetic picks, model writes the sentence) and
+      `recommendation.tsx`. Fixed on the way: web prices are unit prices scaled to their line's
+      quantity; multi-item requests compare confirmed quotes only; the trade-off names any
+      cheaper offer, and the prose may not call the winner cheapest when it is not
+- [x] Conversation per supplier (added 24 Oct at the user's request): the AgentMail thread is
+      read on demand and replies go out threaded from the app; verified on a self-thread, with
+      another user refused
 - [ ] Cron tick: send chase-ups for RFQs sent 3 and 7 days ago, and re-run any request
       stuck in one status for more than 10 minutes
 - [ ] Schedule the tick: an Appwrite Function on a 5-minute cron that calls the route

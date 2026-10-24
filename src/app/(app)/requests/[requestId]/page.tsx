@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowLeft, FileQuestion } from "lucide-react";
 import { Board } from "@/components/requests/board";
 import { LiveRefresh } from "@/components/requests/live-refresh";
+import { Recommendation } from "@/components/requests/recommendation";
 import { RequestHeader } from "@/components/requests/request-header";
 import { ReviewQueue } from "@/components/requests/review-queue";
 import { SendGate } from "@/components/requests/send-gate";
@@ -39,7 +40,7 @@ export default async function RequestPage({
     if (err instanceof UserFacingError) return <RequestNotFound />;
     throw err;
   }
-  const { request, lineItems, events, board, recipients, held } = detail;
+  const { request, lineItems, events, board, recipients, held, recommendation } = detail;
   const confirmedCount = board.filter((row) => row.track === "confirmed").length;
 
   return (
@@ -59,6 +60,7 @@ export default async function RequestPage({
       {request.status !== "discovering" && request.status !== "extracting" && (
         <SendGate requestId={request.$id} recipients={recipients} />
       )}
+      <Recommendation requestId={request.$id} recommendation={recommendation} rows={board} />
       <Timeline events={events} />
     </div>
   );

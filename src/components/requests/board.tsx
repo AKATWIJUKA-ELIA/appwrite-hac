@@ -1,6 +1,7 @@
 "use client";
 
 import { ExternalLink, Info, Mail, MailX, MessageSquareText, Search, Trophy } from "lucide-react";
+import { Conversation } from "@/components/requests/conversation";
 import { TrackBadge, VerificationBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -145,7 +146,12 @@ export function Board({ rows }: Readonly<{ rows: BoardRow[] }>) {
                                   No address found — add one when you approve
                                 </div>
                               )}
-                              {row.reply && <ViewReply row={row} reply={row.reply} />}
+                              <div className="flex flex-wrap gap-1.5">
+                                {row.reply && <ViewReply row={row} reply={row.reply} />}
+                                {row.rfqId && (row.rfqStatus === "sent" || row.rfqStatus === "replied") && (
+                                  <Conversation rfqId={row.rfqId} supplierName={row.supplierName} />
+                                )}
+                              </div>
                             </div>
                           </div>
                         </TableCell>
