@@ -1,7 +1,7 @@
 import "server-only";
 
 import { Query } from "node-appwrite";
-import type { ContactRow, QuoteRow, RfqRow, SupplierRow } from "@/lib/db/rows";
+import type { ContactRow, InboundParseRow, QuoteRow, RfqRow, SupplierRow } from "@/lib/db/rows";
 import { DATABASE_ID, TABLES, type ContactVerification, type RfqStatus } from "@/lib/db/schema";
 import { db } from "@/lib/db/server";
 import type { BoardTrack } from "@/lib/vocabulary";
@@ -27,6 +27,8 @@ export type BoardRow = {
   /** Where the RFQ goes: found by discovery, or typed in at the send gate. */
   contactEmail: string | null;
   contactVerification: ContactVerification | null;
+  /** The supplier's email behind a confirmed price, so the buyer can check it. */
+  reply: { from: string | null; receivedAt: string; text: string } | null;
 };
 
 /**
@@ -68,7 +70,8 @@ export async function loadBoard(requestId: string): Promise<BoardRow[]> {
   const supplierIds = [...new Set([...best.keys(), ...rfqs.rows.map((rfq) => rfq.supplierId)])];
   if (supplierIds.length === 0) return [];
 
-  const [suppliers, contacts] = await Promise.all([
+  const emailedQuoteIds = [...best.values()].filter((q) => q.source === "emailed").map((q) => q.$id);
+  const [suppliers, contacts, replies] = await Promise.all([
     tables.listRows<SupplierRow>({
       databaseId: DATABASE_ID,
       tableId: TABLES.suppliers.id,
@@ -81,7 +84,20 @@ export async function loadBoard(requestId: string): Promise<BoardRow[]> {
       queries: [Query.equal("supplierId", supplierIds), Query.limit(100)],
       total: false,
     }),
+    emailedQuoteIds.length
+      ? tables.listRows<InboundParseRow>({
+          databaseId: DATABASE_ID,
+          tableId: TABLES.inboundParses.id,
+          queries: [
+            Query.equal("quoteId", emailedQuoteIds),
+            Query.select(["quoteId", "fromAddress", "text", "$createdAt"]),
+            Query.limit(emailedQuoteIds.length),
+          ],
+          total: false,
+        })
+      : Promise.resolve({ rows: [] as InboundParseRow[] }),
   ]);
+  const replyByQuote = new Map(replies.rows.map((r) => [r.quoteId, r]));
   const supplierById = new Map(suppliers.rows.map((s) => [s.$id, s]));
   const contactById = new Map(contacts.rows.map((c) => [c.$id, c]));
   // The address the RFQ draft points at; failing that, the supplier's first.
@@ -95,6 +111,7 @@ export async function loadBoard(requestId: string): Promise<BoardRow[]> {
     const quote = best.get(supplierId) ?? null;
     const rfq = rfqBySupplier.get(supplierId) ?? null;
     const contact = contactFor(supplierId, rfq);
+    const reply = quote ? replyByQuote.get(quote.$id) : undefined;
 
     return {
       supplierId,
@@ -125,6 +142,7 @@ export async function loadBoard(requestId: string): Promise<BoardRow[]> {
       rfqStatus: rfq?.status ?? null,
       contactEmail: contact?.email ?? null,
       contactVerification: contact?.verification ?? null,
+      reply: reply ? { from: reply.fromAddress, receivedAt: reply.$createdAt, text: reply.text ?? "" } : null,
     };
   });
 
