@@ -243,7 +243,8 @@ async function enrichCandidate(candidate: Candidate, items: LineItemRow[]): Prom
         })
     : Promise.resolve(null);
 
-  const wanted = items.map((item) => `${item.quantity} x ${item.description}`).join("; ");
+  // Numbered, so the model can say which requested item a listed price is for.
+  const wanted = items.map((item, i) => `[${i}] ${item.quantity} x ${item.description}`).join("; ");
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error("OPENAI_API_KEY is not set");
 
@@ -256,15 +257,17 @@ async function enrichCandidate(candidate: Candidate, items: LineItemRow[]): Prom
       // 30-second request window.
       reasoningEffort: "low",
       system:
-        "You read a supplier web page and extract the vendor, any listed price for the requested " +
-        "item, and a contact email. Return null for anything the page does not state. Never guess " +
-        "an email address or a price.",
+        "You read a supplier web page and extract the vendor, the listed price of ONE unit of one of " +
+        "the requested items (and which item it is, by its [number]), and a contact email. Web shops " +
+        "list unit prices: never multiply by quantity yourself. Return null for anything the page does " +
+        "not state. Never guess an email address or a price.",
       user: `Requested: ${wanted}\n\nPage (${candidate.url}):\n${clip(markdown)}`,
       schemaName: "supplier_extract",
       schema: strictObject({
         supplierName: { type: "string" },
         email: nullable("string"),
-        priceAmount: nullable("number"),
+        unitPrice: nullable("number", "Listed price for one unit"),
+        itemIndex: nullable("number", "The [number] of the requested item the price is for"),
         currency: nullable("string"),
         productDescription: nullable("string"),
       }),
@@ -294,10 +297,7 @@ async function enrichCandidate(candidate: Candidate, items: LineItemRow[]): Prom
       sourceUrl: candidate.url,
       email,
       emailSourceUrl,
-      priceAmount:
-        typeof extracted.priceAmount === "number" && extracted.priceAmount > 0
-          ? extracted.priceAmount
-          : undefined,
+      priceAmount: webPriceForLine(extracted.unitPrice, extracted.itemIndex, items),
       currency:
         typeof extracted.currency === "string" && extracted.currency.length === 3
           ? extracted.currency.toUpperCase()
@@ -307,6 +307,18 @@ async function enrichCandidate(candidate: Candidate, items: LineItemRow[]): Prom
     console.error(`[discover] extraction failed for ${candidate.url}: ${errorText(error)}`);
     return null;
   }
+}
+
+/**
+ * A web listing's unit price, scaled to the quantity of the line it is for,
+ * so it reads as a total for that line, comparable with emailed quotes. With
+ * one line item the line is unambiguous; otherwise the model must say which.
+ */
+function webPriceForLine(unitPrice: unknown, itemIndex: unknown, items: LineItemRow[]): number | undefined {
+  if (typeof unitPrice !== "number" || unitPrice <= 0) return undefined;
+  const index = items.length === 1 ? 0 : typeof itemIndex === "number" ? Math.round(itemIndex) : -1;
+  const item = items[index];
+  return item ? unitPrice * item.quantity : undefined;
 }
 
 /**

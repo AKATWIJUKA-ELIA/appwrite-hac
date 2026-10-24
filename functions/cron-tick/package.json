@@ -1,0 +1,7 @@
+{
+  "name": "quotebook-cron-tick",
+  "private": true,
+  "type": "module",
+  "main": "src/main.js",
+  "description": "Runs hourly and calls the site's /api/cron/tick."
+}

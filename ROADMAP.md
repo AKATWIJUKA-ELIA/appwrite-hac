@@ -193,11 +193,20 @@ one has a web price.
 from the demo mailbox, and the row flips to *Confirmed* with those numbers.
 
 ### Phase 5: Decision, chasing and live updates · Wed 28 Oct
-- [ ] Port `recommendations.compute` as is (arithmetic picks, model writes the sentence)
-      and `recommendation.tsx`
-- [ ] Cron tick: send chase-ups for RFQs sent 3 and 7 days ago, and re-run any request
-      stuck in one status for more than 10 minutes
-- [ ] Schedule the tick: an Appwrite Function on a 5-minute cron that calls the route
+- [x] Port `recommendations.compute` (arithmetic picks, model writes the sentence) and
+      `recommendation.tsx`. Fixed on the way: web prices are unit prices scaled to their line's
+      quantity; multi-item requests compare confirmed quotes only; the trade-off names any
+      cheaper offer, and the prose may not call the winner cheapest when it is not
+- [x] Conversation per supplier (added 24 Oct at the user's request): the AgentMail thread is
+      read on demand and replies go out threaded from the app; verified on a self-thread, with
+      another user refused
+- [x] Cron tick: follow-ups for RFQs sent 3 and 7 days ago, sent as replies on the RFQ
+      thread and claimed with an atomic capped increment (two simultaneous ticks never
+      double-send); requests stuck in extracting/discovering for 10+ minutes are failed with a
+      Retry message rather than re-run (a re-run spends credits; that is the buyer's call)
+- [x] Schedule the tick: Appwrite Function `cron-tick` (source in `functions/cron-tick`,
+      deployed with `npm run fn:deploy`). The free plan allows no cron expressions and no
+      interval under 60 minutes, so it runs hourly. Manual run verified against the live site.
 - [ ] Optional: the Realtime upgrade (D2)
 
 **Done when**: the Dell request ends at *Decided*, with a recommendation and a named trade-off.
