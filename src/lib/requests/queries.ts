@@ -6,6 +6,7 @@ import { DATABASE_ID, TABLES } from "@/lib/db/schema";
 import { db, plain, requireOwnedRequest } from "@/lib/db/server";
 import { requireUser } from "@/lib/auth/session";
 import { loadBoard, type BoardRow } from "@/lib/requests/board";
+import { loadRecipients, type Recipient } from "@/lib/requests/recipients";
 
 export type RequestSummary = Pick<RequestRow, "$id" | "$createdAt" | "title" | "status"> & {
   confirmedQuotes: number;
@@ -65,13 +66,14 @@ export type RequestDetail = {
   lineItems: LineItemRow[];
   events: EventRow[];
   board: BoardRow[];
+  recipients: Recipient[];
 };
 
 /** Everything the request page shows. Throws UserFacingError if not the caller's. */
 export async function getRequestDetail(requestId: string): Promise<RequestDetail> {
   const { request } = await requireOwnedRequest(requestId);
   const tables = db();
-  const [lineItems, events, board] = await Promise.all([
+  const [lineItems, events, board, recipients] = await Promise.all([
     tables.listRows<LineItemRow>({
       databaseId: DATABASE_ID,
       tableId: TABLES.lineItems.id,
@@ -85,7 +87,8 @@ export async function getRequestDetail(requestId: string): Promise<RequestDetail
       total: false,
     }),
     loadBoard(requestId),
+    loadRecipients(requestId),
   ]);
   // Plain data only: this goes straight into client components.
-  return plain({ request, lineItems: lineItems.rows, events: events.rows, board });
+  return plain({ request, lineItems: lineItems.rows, events: events.rows, board, recipients });
 }

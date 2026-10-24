@@ -4,12 +4,13 @@ import { after } from "next/server";
 import { recordEvent, db, UserFacingError } from "@/lib/db/server";
 import { DATABASE_ID, TABLES } from "@/lib/db/schema";
 
-export type Step = "extract" | "discover";
+export type Step = "extract" | "discover" | "send";
 
 // How a failure reads on the request page: "Extraction failed: <cause>".
 const STEP_LABEL: Record<Step, string> = {
   extract: "Extraction",
   discover: "Supplier search",
+  send: "Sending",
 };
 
 // Replaces Convex's scheduler and workflow component. The request's status is

@@ -156,12 +156,18 @@ window without a manual reload.
 one has a web price.
 
 ### Phase 3: Send gate and sending · Mon 26 Oct
-- [ ] Port `send-gate.tsx`: recipient list, per-row address status, preview of the exact email
-- [ ] Actions `addContact` and `clearContact` (with an MX check in `after`), and
+- [x] Port `send-gate.tsx`: recipient list, per-row address status, preview of the exact email
+- [x] Actions `addContact` and `clearContact` (with an MX check in `after`), and
       `approveAndSend` with the **5-recipient cap enforced on the server**
-- [ ] `send` step: inbox from `AGENTMAIL_INBOX_ID`, one REST send per RFQ, each failure
+- [x] `send` step: inbox from `AGENTMAIL_INBOX_ID`, one REST send per RFQ, each failure
       isolated to its own row; `retrySend`
-- [ ] Fill in the postal address in the RFQ footer (the prototype left a TODO)
+- [x] Postal address in the RFQ footer comes from `RFQ_POSTAL_ADDRESS`; the old TODO line is
+      stripped from stored drafts before preview and send (verified in a sent message)
+- [x] Verified 24 Oct via the real server actions: cap, no-address refusal, other-user
+      refusal (both approve and add-address), invalid address, re-approval refusal; two RFQs
+      sent to our own inbox and received with `rfq` / `request:<id>` labels
+- [ ] Set `RFQ_POSTAL_ADDRESS` locally and on the site (needs the user's registered address)
+- [ ] Retry after a real send failure is not yet exercised end to end
 
 **Done when**: an RFQ lands in your demo mailbox (D3), and its row shows *Awaiting reply*.
 

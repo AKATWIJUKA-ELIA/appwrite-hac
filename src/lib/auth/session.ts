@@ -2,7 +2,7 @@ import "server-only";
 
 import { cache } from "react";
 import { redirect } from "next/navigation";
-import type { Models } from "node-appwrite";
+import { AppwriteException, type Models } from "node-appwrite";
 import { createSessionClient } from "@/lib/appwrite/server";
 
 export type UserPrefs = Models.Preferences & { organisation?: string };
@@ -11,13 +11,18 @@ export type CurrentUser = Models.User<UserPrefs>;
 // The real authorization boundary. src/proxy.ts only checks that a cookie is
 // present; this asks Appwrite whether the session behind it is still valid.
 // Cached so a layout and a page in one render share a single round-trip.
+//
+// Only Appwrite saying "unauthorized" means signed out. Anything else (a
+// network blip, a timeout, a 5xx) is rethrown: treating it as signed out would
+// send the user through /api/auth/clear and delete a perfectly good session.
 export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   const session = await createSessionClient();
   if (!session) return null;
   try {
     return await session.account.get<UserPrefs>();
-  } catch {
-    return null;
+  } catch (err) {
+    if (err instanceof AppwriteException && err.code === 401) return null;
+    throw err;
   }
 });
 

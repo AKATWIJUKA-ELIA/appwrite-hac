@@ -91,17 +91,25 @@ export function Board({ rows }: Readonly<{ rows: BoardRow[] }>) {
                             <div className="min-w-0">
                               <div className="leading-tight font-medium">{row.supplierName}</div>
                               {row.supplierDomain && (
-                                <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                  <span className="truncate">{row.supplierDomain}</span>
+                                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                  <a
+                                    href={`https://${row.supplierDomain}`}
+                                    target="_blank"
+                                    rel="noreferrer noopener"
+                                    className="truncate underline-offset-4 hover:text-foreground hover:underline"
+                                  >
+                                    {row.supplierDomain}
+                                  </a>
                                   {row.websiteUrl && (
                                     <a
                                       href={row.websiteUrl}
                                       target="_blank"
                                       rel="noreferrer noopener"
-                                      className="shrink-0 hover:text-foreground"
-                                      aria-label={`Open ${row.supplierName} website`}
+                                      className="inline-flex shrink-0 items-center gap-0.5 hover:text-foreground"
+                                      title="The page this supplier was found on"
                                     >
                                       <ExternalLink className="size-3" />
+                                      <span className="sr-only sm:not-sr-only">listing</span>
                                     </a>
                                   )}
                                 </div>
@@ -109,7 +117,12 @@ export function Board({ rows }: Readonly<{ rows: BoardRow[] }>) {
                               {row.contactEmail ? (
                                 <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs">
                                   <Mail className="size-3 shrink-0 text-muted-foreground" />
-                                  <span className="font-mono break-all">{row.contactEmail}</span>
+                                  <a
+                                    href={`mailto:${row.contactEmail}`}
+                                    className="font-mono break-all underline-offset-4 hover:text-primary hover:underline"
+                                  >
+                                    {row.contactEmail}
+                                  </a>
                                   {row.contactVerification && (
                                     <VerificationBadge
                                       verification={row.contactVerification}
