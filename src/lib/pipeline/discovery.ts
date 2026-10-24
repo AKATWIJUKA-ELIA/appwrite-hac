@@ -485,6 +485,7 @@ async function writeCandidate(
               request.budgetMinor === null
                 ? undefined
                 : formatMoney(request.budgetMinor, request.currency),
+            postalAddress: process.env.RFQ_POSTAL_ADDRESS,
           }),
           chaseCount: 0,
           inboxId: null,

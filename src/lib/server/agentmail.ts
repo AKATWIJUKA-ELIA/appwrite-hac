@@ -5,8 +5,7 @@ import "server-only";
 
 const DEFAULT_BASE_URL = "https://api.agentmail.to/v0";
 
-/** Nothing leaves without a click, and never to more than this many suppliers. */
-export const MAX_RECIPIENTS = 5;
+export { MAX_RECIPIENTS } from "@/lib/limits";
 
 function config() {
   const apiKey = process.env.AGENTMAIL_API_KEY;

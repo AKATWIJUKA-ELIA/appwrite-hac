@@ -4,6 +4,8 @@ import { ArrowLeft, FileQuestion } from "lucide-react";
 import { Board } from "@/components/requests/board";
 import { LiveRefresh } from "@/components/requests/live-refresh";
 import { RequestHeader } from "@/components/requests/request-header";
+import { ReviewQueue } from "@/components/requests/review-queue";
+import { SendGate } from "@/components/requests/send-gate";
 import { Timeline } from "@/components/requests/timeline";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -14,9 +16,16 @@ import { getRequestDetail, type RequestDetail } from "@/lib/requests/queries";
 
 export const metadata: Metadata = { title: "Request · Quotebook" };
 
-// Statuses in which the machine is still working, so the page keeps itself
-// current. `awaiting_approval` and `decided` wait on a person and stay still.
-const IN_FLIGHT: RequestStatus[] = ["extracting", "discovering", "collecting"];
+// How the page keeps itself current, per status. Each refresh costs a dozen
+// database reads, so this is a budget, not a nicety. Extraction and discovery
+// finish in well under a minute: refresh fast, briefly. Replies take hours or
+// days: check occasionally while someone is looking. Statuses that wait on a
+// person (approval, decided, failed) never poll.
+const REFRESH: Partial<Record<RequestStatus, { intervalMs: number; maxDurationMs: number }>> = {
+  extracting: { intervalMs: 3_000, maxDurationMs: 3 * 60_000 },
+  discovering: { intervalMs: 3_000, maxDurationMs: 3 * 60_000 },
+  collecting: { intervalMs: 60_000, maxDurationMs: 15 * 60_000 },
+};
 
 export default async function RequestPage({
   params,
@@ -30,14 +39,26 @@ export default async function RequestPage({
     if (err instanceof UserFacingError) return <RequestNotFound />;
     throw err;
   }
-  const { request, lineItems, events, board } = detail;
+  const { request, lineItems, events, board, recipients, held } = detail;
   const confirmedCount = board.filter((row) => row.track === "confirmed").length;
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-4">
-      <LiveRefresh active={IN_FLIGHT.includes(request.status)} />
+      <LiveRefresh
+        key={request.status}
+        intervalMs={REFRESH[request.status]?.intervalMs ?? null}
+        maxDurationMs={REFRESH[request.status]?.maxDurationMs ?? 0}
+      />
       <RequestHeader request={request} lineItems={lineItems} confirmedCount={confirmedCount} />
       <Board rows={board} />
+      {/* Held replies sit directly under the board: they are the reason a row
+          still reads "awaiting" when a supplier has in fact written back. */}
+      <ReviewQueue held={held} />
+      {/* Hidden while discovery is still adding suppliers, so nobody approves
+          a list that is about to change under them. */}
+      {request.status !== "discovering" && request.status !== "extracting" && (
+        <SendGate requestId={request.$id} recipients={recipients} />
+      )}
       <Timeline events={events} />
     </div>
   );

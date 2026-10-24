@@ -156,23 +156,38 @@ window without a manual reload.
 one has a web price.
 
 ### Phase 3: Send gate and sending · Mon 26 Oct
-- [ ] Port `send-gate.tsx`: recipient list, per-row address status, preview of the exact email
-- [ ] Actions `addContact` and `clearContact` (with an MX check in `after`), and
+- [x] Port `send-gate.tsx`: recipient list, per-row address status, preview of the exact email
+- [x] Actions `addContact` and `clearContact` (with an MX check in `after`), and
       `approveAndSend` with the **5-recipient cap enforced on the server**
-- [ ] `send` step: inbox from `AGENTMAIL_INBOX_ID`, one REST send per RFQ, each failure
+- [x] `send` step: inbox from `AGENTMAIL_INBOX_ID`, one REST send per RFQ, each failure
       isolated to its own row; `retrySend`
-- [ ] Fill in the postal address in the RFQ footer (the prototype left a TODO)
+- [x] Postal address in the RFQ footer comes from `RFQ_POSTAL_ADDRESS`; the old TODO line is
+      stripped from stored drafts before preview and send (verified in a sent message)
+- [x] Verified 24 Oct via the real server actions: cap, no-address refusal, other-user
+      refusal (both approve and add-address), invalid address, re-approval refusal; two RFQs
+      sent to our own inbox and received with `rfq` / `request:<id>` labels
+- [ ] Set `RFQ_POSTAL_ADDRESS` locally and on the site (needs the user's registered address)
+- [ ] Retry after a real send failure is not yet exercised end to end
 
 **Done when**: an RFQ lands in your demo mailbox (D3), and its row shows *Awaiting reply*.
 
 ### Phase 4: Replies · Tue 27 Oct
-- [ ] Webhook route: Svix verification on the raw body; insert into `inboundParses` and
+- [x] Webhook route: Svix verification on the raw body; insert into `inboundParses` and
       treat a 409 on `eventId` as already handled. Unauthenticated senders are held for review.
-- [ ] Port `matchRfq` (by thread, then by sender domain) and `singleOutstandingRequest`
-- [ ] `parse` step: OpenAI quote parse, then `applyParsedQuote` in one transaction
+      Mail from our own inbox is ignored; the parser reads AgentMail's `extracted_text`.
+- [x] Port `matchRfq` (by thread, then by sender domain, sent/replied RFQs only) and
+      `singleOutstandingRequest`
+- [x] `parse` step: OpenAI quote parse, then `applyParsedQuote` in one transaction
       (insert the emailed quote, mark the crawled one `supersededBy`)
-- [ ] Port `review-queue.tsx` with `releaseForParsing` and `linkToRfq`
-- [ ] Point the AgentMail webhook at `https://<host>/api/webhooks/agentmail`
+- [x] Port `review-queue.tsx` with `releaseForParsing` and `linkToRfq`; release and link
+      only from a finished state, and a reply never produces two quotes
+- [x] Verified 24 Oct with signed test deliveries: bad signature 401; own mail, duplicates
+      and other event types ignored; quote reply → confirmed UGX 171,500,000 / VAT / 10 days /
+      12 months with the web price superseded; unauthenticated held; out-of-office → not a
+      quote; stranger → held; release refused for another user
+- [ ] `linkToRfq` not exercised end to end (needs a request with exactly one waiting RFQ)
+- [ ] Point the AgentMail webhook at `https://<host>/api/webhooks/agentmail` (after deploy;
+      the existing webhook targets the old URL and is disabled)
 
 **Done when**: you reply "Total UGX 171,500,000 incl. VAT, 10 days, 12 months warranty"
 from the demo mailbox, and the row flips to *Confirmed* with those numbers.
