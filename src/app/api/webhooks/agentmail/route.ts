@@ -1,4 +1,5 @@
 import { after } from "next/server";
+import { ingestAttachments } from "@/lib/pipeline/attachments";
 import { addressOf, onMessageReceived, parseMessage } from "@/lib/pipeline/inbound";
 import { readSvixHeaders, verifySvixSignature } from "@/lib/server/svix";
 
@@ -45,21 +46,24 @@ export async function POST(request: Request) {
   const inbox = typeof message.inbox_id === "string" ? message.inbox_id.toLowerCase() : "";
   if (from && from === inbox) return new Response(null, { status: 204 });
 
-  const parseId = await onMessageReceived({
+  const received = await onMessageReceived({
     eventId,
     message,
     // AgentMail marks senders that failed SPF/DKIM/DMARC with this event type.
     unauthenticated: eventType === "message.received.unauthenticated",
   });
 
-  if (parseId) {
+  if (received) {
     after(async () => {
       try {
-        await parseMessage(parseId);
+        // PDFs first, for every new reply (held ones too, so the buyer can
+        // open them): their text is what an attachment-only quote is read from.
+        const readable = await ingestAttachments(received.parseId);
+        if (received.autoParse && readable) await parseMessage(received.parseId);
       } catch (err) {
-        // parseMessage records its own failures; this only catches a lost
+        // Each step records its own failures; this only catches a lost
         // connection before it could. The row stays visible as "received".
-        console.error("[webhook] parse failed", parseId, err);
+        console.error("[webhook] processing failed", received.parseId, err);
       }
     });
   }

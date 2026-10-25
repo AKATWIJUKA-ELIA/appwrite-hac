@@ -1,18 +1,8 @@
 "use client";
 
-import { ExternalLink, Info, Mail, MailX, MessageSquareText, Search, Trophy } from "lucide-react";
-import { Conversation } from "@/components/requests/conversation";
+import { ExternalLink, Info, Mail, MailX, Search, Trophy } from "lucide-react";
 import { TrackBadge, VerificationBadge } from "@/components/status-badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import {
   Table,
   TableBody,
@@ -22,7 +12,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { formatAmount, formatMoney, formatTime } from "@/lib/format";
+import { formatAmount, formatMoney } from "@/lib/format";
 import type { BoardRow } from "@/lib/requests/board";
 import { cn } from "@/lib/utils";
 import { TRACK_COPY, type BoardTrack } from "@/lib/vocabulary";
@@ -32,13 +22,16 @@ import { TRACK_COPY, type BoardTrack } from "@/lib/vocabulary";
  * upgrading it — shows up here as the page refreshes. That change is the
  * whole product.
  */
-export function Board({ rows }: Readonly<{ rows: BoardRow[] }>) {
+export function Board({ rows, multiItem = false }: Readonly<{ rows: BoardRow[]; multiItem?: boolean }>) {
   const confirmed = rows.filter((row) => row.track === "confirmed").length;
 
   // The cheapest comparable price, so the leading row can be marked. USD
   // normalisation is preferred because it is the only way two currencies can
   // honestly be compared; rows without it fall back to their own total.
-  const cheapest = rows.reduce<number | null>((low, row) => {
+  // On a request with several items a web listing prices one product, not
+  // the order, so only confirmed quotes compete for the lowest price.
+  const contenders = multiItem ? rows.filter((row) => row.track === "confirmed") : rows;
+  const cheapest = contenders.reduce<number | null>((low, row) => {
     const cost = row.normalizedUsdMinor ?? row.totalMinor;
     if (cost === null) return low;
     return low === null || cost < low ? cost : low;
@@ -82,7 +75,7 @@ export function Board({ rows }: Readonly<{ rows: BoardRow[] }>) {
                   {rows.map((row) => {
                     const cost = row.normalizedUsdMinor ?? row.totalMinor;
                     const leads =
-                      cheapest !== null && cost !== null && cost === cheapest && row.totalMinor !== null;
+                      cheapest !== null && cost !== null && cost === cheapest && row.totalMinor !== null && contenders.includes(row);
 
                     return (
                       <TableRow key={row.supplierId} className={cn(leads && "bg-success-bg/40")}>
@@ -146,12 +139,6 @@ export function Board({ rows }: Readonly<{ rows: BoardRow[] }>) {
                                   No address found — add one when you approve
                                 </div>
                               )}
-                              <div className="flex flex-wrap gap-1.5">
-                                {row.reply && <ViewReply row={row} reply={row.reply} />}
-                                {row.rfqId && (row.rfqStatus === "sent" || row.rfqStatus === "replied") && (
-                                  <Conversation rfqId={row.rfqId} supplierName={row.supplierName} />
-                                )}
-                              </div>
                             </div>
                           </div>
                         </TableCell>
@@ -246,56 +233,3 @@ export function Board({ rows }: Readonly<{ rows: BoardRow[] }>) {
   );
 }
 
-/**
- * The supplier's own words behind a confirmed price. The figures on the board
- * were read from this email by a model, so the buyer can always check them
- * against what was actually written.
- */
-function ViewReply({ row, reply }: Readonly<{ row: BoardRow; reply: NonNullable<BoardRow["reply"]> }>) {
-  const facts: [string, string][] = [
-    ["Total", row.totalMinor !== null && row.currency ? formatMoney(row.totalMinor, row.currency) : "—"],
-    ["VAT", row.vatIncluded === null ? "—" : row.vatIncluded ? "Included" : "Not included"],
-    ["Lead time", row.leadTimeDays !== null ? `${row.leadTimeDays} days` : "—"],
-    ["Warranty", row.warrantyMonths !== null ? `${row.warrantyMonths} months` : "—"],
-  ];
-
-  return (
-    <Dialog>
-      <DialogTrigger
-        render={<Button variant="outline" size="sm" className="mt-1.5 h-6 gap-1 px-2 text-[11px]" />}
-      >
-        <MessageSquareText className="size-3" />
-        View reply
-      </DialogTrigger>
-      <DialogContent className="max-h-[80dvh] overflow-y-auto sm:max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>Reply from {row.supplierName}</DialogTitle>
-          <DialogDescription>
-            {reply.from ?? "Unknown sender"} · {formatTime(reply.receivedAt)}
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-3">
-          <div className="rounded-lg border p-3">
-            <pre className="font-sans text-sm leading-relaxed whitespace-pre-wrap">
-              {reply.text || "(The message had no text.)"}
-            </pre>
-          </div>
-          <div className="rounded-lg border bg-muted/30 p-3">
-            <p className="mb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">
-              What we read from it
-            </p>
-            <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm sm:grid-cols-4">
-              {facts.map(([label, value]) => (
-                <div key={label}>
-                  <dt className="text-xs text-muted-foreground">{label}</dt>
-                  <dd className="tabular font-medium">{value}</dd>
-                </div>
-              ))}
-            </dl>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}

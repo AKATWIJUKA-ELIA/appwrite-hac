@@ -44,10 +44,12 @@ export function RequestHeader({
   request,
   lineItems,
   confirmedCount,
+  awaitingCount = 0,
 }: Readonly<{
   request: RequestRow;
   lineItems: LineItemRow[];
   confirmedCount: number;
+  awaitingCount?: number;
 }>) {
   return (
     <Card>
@@ -74,7 +76,7 @@ export function RequestHeader({
         </div>
 
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <PipelineProgress status={request.status} />
+          <PipelineProgress status={request.status} quotesIn={confirmedCount} awaiting={awaitingCount} />
           {request.status === "discovering" && <StopSearch requestId={request.$id} />}
         </div>
 

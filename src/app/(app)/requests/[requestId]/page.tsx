@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft, FileQuestion } from "lucide-react";
 import { Board } from "@/components/requests/board";
+import { ConversationsPanel, type ThreadSummary } from "@/components/requests/conversation";
 import { LiveRefresh } from "@/components/requests/live-refresh";
 import { Recommendation } from "@/components/requests/recommendation";
 import { RequestHeader } from "@/components/requests/request-header";
@@ -14,6 +15,7 @@ import { HOME_PATH } from "@/lib/auth/constants";
 import type { RequestStatus } from "@/lib/db/schema";
 import { UserFacingError } from "@/lib/db/server";
 import { getRequestDetail, type RequestDetail } from "@/lib/requests/queries";
+import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Request · Quotebook" };
 
@@ -43,25 +45,76 @@ export default async function RequestPage({
   const { request, lineItems, events, board, recipients, held, recommendation } = detail;
   const confirmedCount = board.filter((row) => row.track === "confirmed").length;
 
+  // One conversation per supplier actually emailed, with the figures read
+  // from a confirmed reply so they can be checked against the thread.
+  const boardByRfq = new Map(board.filter((row) => row.rfqId).map((row) => [row.rfqId as string, row]));
+  const threads: ThreadSummary[] = recipients
+    .filter((r) => r.status === "sent" || r.status === "replied")
+    .map((r) => {
+      const row = boardByRfq.get(r.rfqId);
+      return {
+        rfqId: r.rfqId,
+        supplierName: r.supplierName,
+        email: r.email,
+        status: r.status,
+        sentAt: r.sentAt,
+        repliedAt: r.repliedAt,
+        readAs:
+          row?.track === "confirmed" && row.totalMinor !== null && row.currency
+            ? {
+                totalMinor: row.totalMinor,
+                currency: row.currency,
+                vatIncluded: row.vatIncluded,
+                leadTimeDays: row.leadTimeDays,
+                warrantyMonths: row.warrantyMonths,
+              }
+            : null,
+      };
+    });
+  const hasConversations = threads.length > 0;
+
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-4">
+    <div className={cn("mx-auto w-full space-y-4", hasConversations ? "max-w-7xl" : "max-w-5xl")}>
       <LiveRefresh
         key={request.status}
         intervalMs={REFRESH[request.status]?.intervalMs ?? null}
         maxDurationMs={REFRESH[request.status]?.maxDurationMs ?? 0}
       />
-      <RequestHeader request={request} lineItems={lineItems} confirmedCount={confirmedCount} />
-      <Board rows={board} />
-      {/* Held replies sit directly under the board: they are the reason a row
-          still reads "awaiting" when a supplier has in fact written back. */}
-      <ReviewQueue held={held} />
-      {/* Hidden while discovery is still adding suppliers, so nobody approves
-          a list that is about to change under them. */}
-      {request.status !== "discovering" && request.status !== "extracting" && (
-        <SendGate requestId={request.$id} recipients={recipients} />
-      )}
-      <Recommendation requestId={request.$id} recommendation={recommendation} rows={board} />
-      <Timeline events={events} />
+      <RequestHeader
+        request={request}
+        lineItems={lineItems}
+        confirmedCount={confirmedCount}
+        awaitingCount={board.filter((row) => row.track === "awaiting").length}
+      />
+      <div className={cn("gap-4", hasConversations && "grid lg:grid-cols-[minmax(0,1fr)_24rem]")}>
+        <div className="min-w-0 space-y-4">
+          <Board rows={board} multiItem={lineItems.length > 1} />
+          {/* On narrow screens the conversations follow the board directly,
+              where a reply is most likely to be looked for. */}
+          {hasConversations && (
+            <div className="lg:hidden">
+              <ConversationsPanel threads={threads} />
+            </div>
+          )}
+          {/* Held replies sit directly under the board: they are the reason a row
+              still reads "awaiting" when a supplier has in fact written back. */}
+          <ReviewQueue held={held} />
+          {/* Hidden while discovery is still adding suppliers, so nobody approves
+              a list that is about to change under them. */}
+          {request.status !== "discovering" && request.status !== "extracting" && (
+            <SendGate requestId={request.$id} recipients={recipients} />
+          )}
+          <Recommendation requestId={request.$id} recommendation={recommendation} rows={board} />
+          <Timeline events={events} />
+        </div>
+        {hasConversations && (
+          <aside className="hidden lg:block">
+            <div className="sticky top-4">
+              <ConversationsPanel threads={threads} />
+            </div>
+          </aside>
+        )}
+      </div>
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import "server-only";
 
 import { cookies } from "next/headers";
-import { Account, AppwriteException, Client, TablesDB, Users } from "node-appwrite";
+import { Account, AppwriteException, Client, Storage, TablesDB, Users } from "node-appwrite";
 import { SESSION_COOKIE } from "@/lib/auth/constants";
 
 const endpoint = process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!;
@@ -52,6 +52,7 @@ export function createAdminClient() {
     account: new Account(client),
     users: withReadRetry(new Users(client)),
     tablesDB: withReadRetry(new TablesDB(client)),
+    storage: withReadRetry(new Storage(client)),
   };
 }
 
