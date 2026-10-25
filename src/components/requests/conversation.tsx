@@ -35,7 +35,14 @@ export type ThreadSummary = {
  * top and marked. Picking one opens its email thread right here, with a box
  * to answer it; the answer goes out as an email reply on the same thread.
  */
-export function ConversationsPanel({ threads }: Readonly<{ threads: ThreadSummary[] }>) {
+export function ConversationsPanel({
+  threads,
+  version,
+}: Readonly<{
+  threads: ThreadSummary[];
+  /** Newest activity on the request; when realtime brings a newer one, the open thread reloads. */
+  version?: string;
+}>) {
   // Replied first (newest reply on top), then the ones still waiting.
   const ordered = [...threads].sort((a, b) => {
     if (!!a.repliedAt !== !!b.repliedAt) return a.repliedAt ? -1 : 1;
@@ -111,7 +118,7 @@ export function ConversationsPanel({ threads }: Readonly<{ threads: ThreadSummar
             })}
           </ul>
 
-          {current && <ChatThread key={current.rfqId} thread={current} />}
+          {current && <ChatThread key={current.rfqId} thread={current} version={version} />}
         </CardContent>
       )}
     </Card>
@@ -119,7 +126,7 @@ export function ConversationsPanel({ threads }: Readonly<{ threads: ThreadSummar
 }
 
 /** One supplier's email thread, loaded from AgentMail when shown, with a reply box. */
-function ChatThread({ thread: summary }: Readonly<{ thread: ThreadSummary }>) {
+function ChatThread({ thread: summary, version }: Readonly<{ thread: ThreadSummary; version?: string }>) {
   const router = useRouter();
   const [thread, setThread] = useState<Thread | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -138,9 +145,11 @@ function ChatThread({ thread: summary }: Readonly<{ thread: ThreadSummary }>) {
     else setThread(result.conversation ?? null);
   }, [summary.rfqId]);
 
+  // A new reply arrives as a realtime refresh that changes `version` (and
+  // `repliedAt`); the thread lives in AgentMail, so it must be fetched again.
   useEffect(() => {
     void load();
-  }, [load]);
+  }, [load, version, summary.repliedAt]);
 
   useEffect(() => {
     scroller.current?.scrollTo({ top: scroller.current.scrollHeight });

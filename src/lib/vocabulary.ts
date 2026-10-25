@@ -36,7 +36,12 @@ export const STATUS_COPY: Record<RequestStatus, { label: string; hint: string; t
   },
   decided: {
     label: "Decided",
-    hint: "A supplier has been recommended for this request.",
+    hint: "A supplier has been recommended. Award the order when you are ready.",
+    tone: "good",
+  },
+  awarded: {
+    label: "Awarded",
+    hint: "A purchase order has gone to the chosen supplier. Their acceptance arrives in the conversation.",
     tone: "good",
   },
   failed: {

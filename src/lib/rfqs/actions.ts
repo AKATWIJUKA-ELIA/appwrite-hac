@@ -36,9 +36,9 @@ async function requireOwnedRfq(rfqId: string) {
   }
   if (!rfq) throw new UserFacingError("That draft no longer exists.");
   const { request } = await requireOwnedRequest(rfq.requestId);
-  // "failed" is editable too: a send that failed on a bad address is exactly
-  // the case where the address needs changing before the retry.
-  if (rfq.status !== "draft" && rfq.status !== "failed") {
+  // "failed" and "bounced" are editable too: a send that failed or bounced on
+  // a bad address is exactly the case where the address needs changing.
+  if (rfq.status !== "draft" && rfq.status !== "failed" && rfq.status !== "bounced") {
     throw new UserFacingError("This RFQ has already been approved or sent.");
   }
   return { rfq, request };
@@ -235,8 +235,9 @@ export async function approveAndSend(requestId: string, rfqIds: string[]): Promi
  * Retry the sends that failed. The buyer already approved these exact
  * recipients and a transport failure does not undo that, so they go back to
  * `approved` and are sent again. The cap was applied at approval and holds.
+ * With `rfqId`, only that one supplier is retried.
  */
-export async function retrySend(requestId: string): Promise<Result & { retried?: number }> {
+export async function retrySend(requestId: string, rfqId?: string): Promise<Result & { retried?: number }> {
   let retried = 0;
   try {
     const { request } = await requireOwnedRequest(requestId);
@@ -246,16 +247,19 @@ export async function retrySend(requestId: string): Promise<Result & { retried?:
       tableId: TABLES.rfqs.id,
       queries: [
         Query.equal("requestId", requestId),
-        Query.equal("status", ["failed", "approved"]),
+        Query.equal("status", ["failed", "bounced", "approved"]),
+        ...(rfqId ? [Query.equal("$id", rfqId)] : []),
         Query.limit(50),
       ],
       total: false,
     });
-    if (rows.length === 0) throw new UserFacingError("There are no failed sends to retry.");
+    if (rows.length === 0) {
+      throw new UserFacingError(rfqId ? "This send is no longer waiting for a retry." : "There are no failed sends to retry.");
+    }
 
     await withTransaction(async (transactionId) => {
       for (const rfq of rows) {
-        if (rfq.status !== "failed") continue;
+        if (rfq.status !== "failed" && rfq.status !== "bounced") continue;
         await tables.updateRow({
           databaseId: DATABASE_ID,
           tableId: TABLES.rfqs.id,
@@ -274,7 +278,7 @@ export async function retrySend(requestId: string): Promise<Result & { retried?:
     });
     retried = rows.length;
 
-    runStep("send", { id: requestId, ownerId: request.userId }, () => sendApproved(requestId));
+    runStep("send", { id: requestId, ownerId: request.userId }, () => sendApproved(requestId, rfqId));
     revalidatePath(`/requests/${requestId}`);
   } catch (err) {
     return actionError(err);

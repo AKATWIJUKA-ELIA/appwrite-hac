@@ -3,6 +3,7 @@ import "server-only";
 import { Query } from "node-appwrite";
 import type { ContactRow, RfqRow, SupplierRow } from "@/lib/db/rows";
 import { DATABASE_ID, TABLES, type ContactVerification, type RfqStatus } from "@/lib/db/schema";
+import { presentableReason } from "@/lib/errors";
 import { db } from "@/lib/db/server";
 import { finalizeRfqBody } from "@/lib/rfq-text";
 
@@ -69,7 +70,7 @@ export async function loadRecipients(requestId: string): Promise<Recipient[]> {
       chaseCount: rfq.chaseCount,
       sentAt: rfq.sentAt,
       repliedAt: rfq.repliedAt,
-      failureReason: rfq.failureReason,
+      failureReason: presentableReason(rfq.failureReason),
       supplierName: supplier?.name ?? "Unknown supplier",
       supplierDomain: supplier?.domain ?? "",
       email: contact?.email ?? null,

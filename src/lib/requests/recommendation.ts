@@ -6,6 +6,7 @@ import { DATABASE_ID, TABLES } from "@/lib/db/schema";
 import { db, isNotFound } from "@/lib/db/server";
 
 export type RecommendationView = {
+  quoteId: string;
   supplierName: string;
   totalMinor: number | null;
   currency: string | null;
@@ -54,6 +55,7 @@ export async function loadRecommendation(requestId: string): Promise<Recommendat
   }
 
   return {
+    quoteId: recommendation.quoteId,
     supplierName: supplier?.name ?? "Unknown supplier",
     totalMinor: quote?.totalMinor ?? null,
     currency: quote?.currency ?? null,

@@ -6,6 +6,7 @@ import { normalizeToUsdMinor, toMinor, type FxSnapshot } from "@/lib/money";
 import type { InboundParseRow, QuoteRow, RequestRow, RfqRow, SupplierRow } from "@/lib/db/rows";
 import { DATABASE_ID, TABLES, type ParseState } from "@/lib/db/schema";
 import { db, isConflict, ownerPermissions, recordEvent, withTransaction } from "@/lib/db/server";
+import { bouncedRecipients, markBounced } from "@/lib/pipeline/bounces";
 import { fetchUsdRates } from "@/lib/server/fx";
 import { nullable, openAiJson, PARSING_MODEL, strictObject } from "@/lib/server/openai";
 
@@ -46,6 +47,40 @@ export async function onMessageReceived(
   // The reply without the quoted history (our own RFQ text) when AgentMail
   // could separate it, which is what the parser should read.
   const body = asString(message.extracted_text) ?? asString(message.text) ?? asString(message.html) ?? "";
+
+  // A delivery-failure notice is the mail system telling us an RFQ bounced,
+  // not a supplier's reply: mark the RFQ and the address, keep a record of the
+  // notice, and keep it out of the review queue.
+  const bounced = bouncedRecipients(from ?? "", asString(message.text) ?? body, inboxId ?? "");
+  if (bounced) {
+    const bounceOwner = await markBounced(bounced, inboxId);
+    try {
+      await tables.createRow<InboundParseRow>({
+        databaseId: DATABASE_ID,
+        tableId: TABLES.inboundParses.id,
+        rowId: ID.unique(),
+        data: {
+          eventId: incoming.eventId.slice(0, 255),
+          messageId: messageId.slice(0, 255),
+          threadId: threadId?.slice(0, 255) ?? null,
+          inboxId: inboxId?.slice(0, 255) ?? null,
+          rfqId: null,
+          candidateRequestId: null,
+          state: "not_a_quote",
+          reason: `Delivery failure notice${bounced.length ? ` for ${bounced.join(", ")}` : ""}.`.slice(0, 2000),
+          quoteId: null,
+          attempts: 0,
+          lastError: null,
+          fromAddress: from?.slice(0, 320) ?? null,
+          text: body.slice(0, 8_000),
+        },
+        permissions: bounceOwner ? ownerPermissions(bounceOwner.userId) : [],
+      });
+    } catch (err) {
+      if (!isConflict(err)) throw err;
+    }
+    return null;
+  }
 
   const rfq = await matchRfq({ threadId, from });
   const candidateRequestId = rfq ? null : await singleOutstandingRequest(inboxId);
@@ -308,7 +343,7 @@ export async function parseMessage(parseId: string): Promise<void> {
       rowId: parseId,
       data: {
         state: "needs_review",
-        reason: `Parse failed: ${errorText(error)}`.slice(0, 2000),
+        reason: "This reply could not be read automatically. Read it, then release it to try again.",
         lastError: errorText(error).slice(0, 2000),
       },
     });

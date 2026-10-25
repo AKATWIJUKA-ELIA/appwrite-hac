@@ -12,12 +12,12 @@ import {
   Square,
   Wallet,
 } from "lucide-react";
-import { PipelineProgress } from "@/components/requests/pipeline-progress";
 import { StatusBadge } from "@/components/status-badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import type { LineItemRow, RequestRow } from "@/lib/db/rows";
+import { presentableReason } from "@/lib/errors";
 import { formatMoney } from "@/lib/format";
 import { cancelDiscovery, retryRequest } from "@/lib/requests/actions";
 
@@ -42,27 +42,35 @@ function productSpecs(specs: string | null): [string, string][] {
 
 export function RequestHeader({
   request,
-  lineItems,
   confirmedCount,
-  awaitingCount = 0,
+  actions,
 }: Readonly<{
   request: RequestRow;
-  lineItems: LineItemRow[];
   confirmedCount: number;
-  awaitingCount?: number;
+  /** Buttons for the top-right of the header, such as the activity panel. */
+  actions?: React.ReactNode;
 }>) {
   return (
     <Card>
-      <CardContent className="space-y-5">
+      <CardContent className="space-y-3">
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0 space-y-1">
-            <h1 className="text-xl font-semibold tracking-tight text-balance sm:text-2xl">
-              {request.title}
-            </h1>
-            <p className="text-sm text-pretty text-muted-foreground">{request.rawText}</p>
+          <div className="min-w-0 space-y-2">
+            <h1 className="text-xl font-semibold tracking-tight text-balance sm:text-2xl">{request.title}</h1>
+            <div className="flex flex-wrap gap-1.5">
+              <Chip icon={MapPin}>{request.deliverTo}</Chip>
+              <Chip icon={CalendarClock} muted={request.deliveryWindowDays === null}>
+                {request.deliveryWindowDays === null ? "No delivery window" : `Within ${request.deliveryWindowDays} days`}
+              </Chip>
+              <Chip icon={Wallet} muted={request.budgetMinor === null}>
+                {request.budgetMinor === null
+                  ? `No budget stated (${request.currency})`
+                  : `Budget ${formatMoney(request.budgetMinor, request.currency)}`}
+              </Chip>
+            </div>
           </div>
 
           <div className="flex shrink-0 flex-wrap items-center gap-2">
+            {actions}
             <StatusBadge status={request.status} />
             {/* "Waiting on replies" stops being the whole truth the moment one
                 arrives. The status stays `collecting` because other suppliers
@@ -72,58 +80,57 @@ export function RequestHeader({
                 {confirmedCount} quote{confirmedCount === 1 ? "" : "s"} in
               </span>
             )}
+            {request.status === "discovering" && <StopSearch requestId={request.$id} />}
           </div>
         </div>
 
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <PipelineProgress status={request.status} quotesIn={confirmedCount} awaiting={awaitingCount} />
-          {request.status === "discovering" && <StopSearch requestId={request.$id} />}
-        </div>
-
         {request.status === "failed" && (
-          <RetryRequest
-            requestId={request.$id}
-            reason={request.failureReason ?? "This request failed."}
-          />
+          <RetryRequest requestId={request.$id} reason={presentableReason(request.failureReason) ?? "This request failed."} />
         )}
+      </CardContent>
+    </Card>
+  );
+}
 
-        <dl className="grid gap-3 sm:grid-cols-3">
-          <Fact icon={MapPin} label="Deliver to" value={request.deliverTo} />
-          <Fact
-            icon={CalendarClock}
-            label="Delivery window"
-            value={
-              request.deliveryWindowDays === null
-                ? "Not stated"
-                : `${request.deliveryWindowDays} days`
-            }
-            muted={request.deliveryWindowDays === null}
-          />
-          <Fact
-            icon={Wallet}
-            label="Budget ceiling"
-            value={
-              request.budgetMinor === null
-                ? `Not stated (${request.currency})`
-                : formatMoney(request.budgetMinor, request.currency)
-            }
-            muted={request.budgetMinor === null}
-          />
-        </dl>
+function Chip({
+  icon: Icon,
+  muted,
+  children,
+}: Readonly<{ icon: React.ComponentType<{ className?: string }>; muted?: boolean; children: React.ReactNode }>) {
+  return (
+    <span
+      className={
+        "inline-flex items-center gap-1.5 rounded-md border bg-muted/30 px-2 py-1 text-xs " +
+        (muted ? "text-muted-foreground" : "font-medium")
+      }
+    >
+      <Icon className="size-3.5 shrink-0 text-muted-foreground" />
+      {children}
+    </span>
+  );
+}
 
-        {lineItems.length > 0 && (
+/** The request as written and as read: the Read step's panel. */
+export function RequestDetails({ request, lineItems }: Readonly<{ request: RequestRow; lineItems: LineItemRow[] }>) {
+  return (
+    <Card>
+      <CardContent className="space-y-4">
+        <div className="space-y-1">
+          <h2 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Your request</h2>
+          <p className="text-sm text-pretty">{request.rawText}</p>
+        </div>
+        {lineItems.length === 0 ? (
+          <p className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">
+            The line items appear here once the request has been read.
+          </p>
+        ) : (
           <div className="space-y-2">
-            <h2 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-              Line items
-            </h2>
+            <h2 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Line items</h2>
             <ul className="divide-y rounded-lg border">
               {lineItems.map((item) => {
                 const specs = productSpecs(item.specs);
                 return (
-                  <li
-                    key={item.$id}
-                    className="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-3 py-2.5"
-                  >
+                  <li key={item.$id} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-3 py-2.5">
                     <span className="tabular text-sm font-semibold">
                       {item.quantity.toLocaleString()}
                       {item.unit ? ` ${item.unit}` : " ×"}
@@ -132,10 +139,7 @@ export function RequestHeader({
                     {specs.length > 0 && (
                       <span className="flex flex-wrap gap-1">
                         {specs.map(([key, value]) => (
-                          <span
-                            key={key}
-                            className="rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground"
-                          >
+                          <span key={key} className="rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">
                             {key}: {value}
                           </span>
                         ))}
@@ -149,30 +153,6 @@ export function RequestHeader({
         )}
       </CardContent>
     </Card>
-  );
-}
-
-function Fact({
-  icon: Icon,
-  label,
-  value,
-  muted,
-}: Readonly<{
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  value: string;
-  muted?: boolean;
-}>) {
-  return (
-    <div className="rounded-lg border bg-muted/30 px-3 py-2">
-      <dt className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        <Icon className="size-3.5" />
-        {label}
-      </dt>
-      <dd className={muted ? "mt-0.5 text-sm text-muted-foreground" : "mt-0.5 text-sm font-medium"}>
-        {value}
-      </dd>
-    </div>
   );
 }
 

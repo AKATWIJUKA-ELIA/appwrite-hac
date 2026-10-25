@@ -204,3 +204,27 @@
 .animate-live {
   animation: quotebook-shimmer 1.8s ease-in-out infinite;
 }
+
+/*
+ * A draining bar along the bottom of each toast, timed to its auto-dismiss.
+ * Sonner already uses both pseudo-elements, so the bar is a background layer.
+ * Sonner pauses its timers while the stack is hovered; the bar pauses with it.
+ */
+@keyframes quotebook-toast-drain {
+  from { background-size: 100% 3px; }
+  to { background-size: 0% 3px; }
+}
+
+[data-sonner-toast]:not([data-type="loading"]) {
+  background-image: linear-gradient(
+    color-mix(in oklab, currentColor 45%, transparent),
+    color-mix(in oklab, currentColor 45%, transparent)
+  ) !important;
+  background-repeat: no-repeat !important;
+  background-position: left bottom !important;
+  animation: quotebook-toast-drain var(--toast-duration, 4s) linear forwards;
+}
+
+[data-sonner-toaster]:hover [data-sonner-toast] {
+  animation-play-state: paused;
+}

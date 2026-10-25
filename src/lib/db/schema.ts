@@ -22,6 +22,8 @@ export const REQUEST_STATUS = [
   "awaiting_approval",
   "collecting",
   "decided",
+  // A purchase order has gone to the chosen supplier.
+  "awarded",
   "failed",
 ] as const;
 
@@ -116,6 +118,10 @@ export const TABLES = {
       { key: "budgetMinor", type: "bigint", min: 0 },
       currency,
       { key: "failureReason", type: "text" },
+      // The award: which quote won, the PO number sent with it, and when.
+      id("awardedQuoteId", false),
+      { key: "poNumber", type: "varchar", size: 40 },
+      { key: "awardedAt", type: "datetime" },
     ],
     indexes: [
       { key: "by_userId", type: "key", columns: ["userId", "$createdAt"], orders: ["asc", "desc"] },
