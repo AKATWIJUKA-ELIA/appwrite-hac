@@ -71,12 +71,18 @@ export async function sendConversationReply(rfqId: string, rawText: string): Pro
     if (!lastMessageId) throw new UserFacingError("This conversation has no messages to reply to.");
 
     await replyToMessage({ inboxId: rfq.inboxId, messageId: lastMessageId, text });
-    await recordEvent({
-      requestId: rfq.requestId,
-      ownerId: request.userId,
-      kind: "conversation.reply",
-      message: `You replied to ${supplier.name} from Quotebook.`,
-    });
+    // The email has gone; nothing after this point may report "not sent".
+    // The timeline entry is bookkeeping, so a dropped write is logged only.
+    try {
+      await recordEvent({
+        requestId: rfq.requestId,
+        ownerId: request.userId,
+        kind: "conversation.reply",
+        message: `You replied to ${supplier.name} from Quotebook.`,
+      });
+    } catch (err) {
+      console.error("[conversation] reply sent, timeline entry not recorded", err);
+    }
   } catch (err) {
     return actionError(err);
   }

@@ -29,19 +29,36 @@ const ORDER: Partial<Record<RequestStatus, number>> = {
   decided: 4,
 };
 
-export function PipelineProgress({ status }: Readonly<{ status: RequestStatus }>) {
+export function PipelineProgress({
+  status,
+  quotesIn = 0,
+  awaiting = 0,
+}: Readonly<{ status: RequestStatus; quotesIn?: number; awaiting?: number }>) {
   if (status === "failed" || status === "draft") return null;
 
   const current = ORDER[status] ?? -1;
   const busy = STATUS_COPY[status].tone === "busy";
   const needsYou = status === "awaiting_approval";
+  // Collecting stays the status while other replies may still come, but once
+  // a confirmed quote is in, the next move is the buyer's: say so, and light
+  // up the Decide stage as waiting on them.
+  const readyToDecide = status === "collecting" && quotesIn > 0;
+  const hint = !readyToDecide
+    ? STATUS_COPY[status].hint
+    : awaiting === 0
+      ? "Every supplier you contacted has replied. Compare the quotes and recommend a supplier below."
+      : `${quotesIn} quote${quotesIn === 1 ? "" : "s"} in, ${awaiting} still awaited. You can recommend a supplier now or wait for the rest.`;
 
   return (
     <div className="space-y-2">
       <ol className="flex flex-wrap items-center gap-x-1 gap-y-2">
         {STAGES.map((stage, index) => {
-          const done = index < current || status === "decided";
-          const active = index === current && status !== "decided";
+          // With every contacted supplier answered, collecting is finished in
+          // fact even though the status waits for the buyer's decision.
+          const allIn = readyToDecide && awaiting === 0 && stage.key === "collect";
+          const done = index < current || status === "decided" || allIn;
+          const active = index === current && status !== "decided" && !allIn;
+          const yourMove = readyToDecide && stage.key === "decide";
 
           return (
             <li key={stage.key} className="flex items-center gap-1">
@@ -51,7 +68,8 @@ export function PipelineProgress({ status }: Readonly<{ status: RequestStatus }>
                   done && "border-success/25 bg-success-bg text-success",
                   active && !needsYou && "border-track-web/25 bg-track-web-bg text-track-web",
                   active && needsYou && "border-warning/30 bg-warning-bg text-warning",
-                  !done && !active && "border-border text-muted-foreground/70",
+                  yourMove && "border-warning/30 bg-warning-bg text-warning",
+                  !done && !active && !yourMove && "border-border text-muted-foreground/70",
                 )}
               >
                 {done ? (
@@ -74,7 +92,7 @@ export function PipelineProgress({ status }: Readonly<{ status: RequestStatus }>
         })}
       </ol>
 
-      <p className="text-xs text-muted-foreground">{STATUS_COPY[status].hint}</p>
+      <p className={cn("text-xs", readyToDecide ? "font-medium text-foreground" : "text-muted-foreground")}>{hint}</p>
     </div>
   );
 }
