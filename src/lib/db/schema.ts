@@ -358,3 +358,8 @@ export const TABLES = {
 } satisfies Record<string, TableSpec>;
 
 export type TableKey = keyof typeof TABLES;
+
+// Appwrite Storage bucket for supplier attachments (PDF quotations). It has
+// no public permissions: files are only reachable through the owner-checked
+// /api/attachments route, using the server's API key.
+export const ATTACHMENTS_BUCKET_ID = "6addafa900340bd5d7c7";

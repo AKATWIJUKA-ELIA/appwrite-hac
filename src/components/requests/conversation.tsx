@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Loader2, MessagesSquare, RefreshCw, Send } from "lucide-react";
+import { Loader2, MessagesSquare, Paperclip, RefreshCw, Send } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -208,7 +208,25 @@ function ChatThread({ thread: summary }: Readonly<{ thread: ThreadSummary }>) {
                 <p className={cn("mb-1 text-[10px]", ours ? "text-primary-foreground/75" : "text-muted-foreground")}>
                   {ours ? "You" : summary.supplierName} · {formatTime(message.sentAt)}
                 </p>
-                <p className="leading-relaxed break-words whitespace-pre-wrap">{message.text || "(no text)"}</p>
+                <p className="leading-relaxed break-words whitespace-pre-wrap">
+                  {message.text || (message.attachments.length ? "" : "(no text)")}
+                </p>
+                {message.attachments.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {message.attachments.map((file) => (
+                      <a
+                        key={file.id}
+                        href={`/api/attachments/${file.id}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex max-w-full items-center gap-1 rounded-md border bg-background px-2 py-1 text-xs font-medium text-foreground hover:bg-accent"
+                      >
+                        <Paperclip className="size-3 shrink-0" />
+                        <span className="truncate">{file.filename}</span>
+                      </a>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           );

@@ -121,3 +121,15 @@ export type EventRow = Models.Row & {
   message: string;
   meta: string | null;
 };
+
+export type AttachmentRow = Models.Row & {
+  rfqId: string | null;
+  inboundParseId: string | null;
+  /** The file's id in the attachments Storage bucket. */
+  fileId: string;
+  filename: string;
+  contentType: string | null;
+  sizeBytes: number | null;
+  /** True once text was read out of the file for the quote parser. */
+  parsed: boolean;
+};

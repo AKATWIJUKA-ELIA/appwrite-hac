@@ -31,10 +31,12 @@ export type IncomingMessage = {
  * by a unique index on `eventId`, so a redelivered webhook is a no-op instead
  * of a second model call and a second quote.
  *
- * Returns the id of a new row that should be parsed next, or null when there
- * is nothing to parse (a duplicate, or a message held for review).
+ * Returns the new row, and whether it should be read automatically (a reply
+ * held for review is stored but not parsed), or null for a duplicate.
  */
-export async function onMessageReceived(incoming: IncomingMessage): Promise<string | null> {
+export async function onMessageReceived(
+  incoming: IncomingMessage,
+): Promise<{ parseId: string; autoParse: boolean } | null> {
   const tables = db();
   const message = incoming.message;
   const messageId = asString(message.message_id) ?? incoming.eventId;
@@ -123,9 +125,9 @@ export async function onMessageReceived(incoming: IncomingMessage): Promise<stri
         message: `Unauthenticated reply from ${from ?? "an unknown sender"} held for review.`,
       });
     }
-    return null;
+    return { parseId: parse.$id, autoParse: false };
   }
-  return parse.$id;
+  return { parseId: parse.$id, autoParse: true };
 }
 
 /**

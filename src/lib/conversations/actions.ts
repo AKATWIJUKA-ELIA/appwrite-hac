@@ -1,17 +1,47 @@
 "use server";
 
-import type { RfqRow, SupplierRow } from "@/lib/db/rows";
+import { Query } from "node-appwrite";
+import type { AttachmentRow, InboundParseRow, RfqRow, SupplierRow } from "@/lib/db/rows";
 import { DATABASE_ID, TABLES } from "@/lib/db/schema";
 import { actionError, db, isNotFound, recordEvent, requireOwnedRequest, UserFacingError } from "@/lib/db/server";
 import { getThread, replyToMessage, type ThreadMessage } from "@/lib/server/agentmail";
 
 const MAX_REPLY_CHARS = 5_000;
 
+export type FileRef = { id: string; filename: string; sizeBytes: number | null };
+
 export type Conversation = {
   supplierName: string;
   supplierEmail: string | null;
-  messages: ThreadMessage[];
+  messages: (ThreadMessage & { attachments: FileRef[] })[];
 };
+
+/** Stored attachments on this RFQ's replies, keyed by the email they came with. */
+async function attachmentsByMessage(rfqId: string): Promise<Map<string, FileRef[]>> {
+  const tables = db();
+  const { rows } = await tables.listRows<AttachmentRow>({
+    databaseId: DATABASE_ID,
+    tableId: TABLES.attachments.id,
+    queries: [Query.equal("rfqId", rfqId), Query.limit(50)],
+    total: false,
+  });
+  const parseIds = [...new Set(rows.flatMap((a) => (a.inboundParseId ? [a.inboundParseId] : [])))];
+  if (parseIds.length === 0) return new Map();
+  const { rows: parses } = await tables.listRows<InboundParseRow>({
+    databaseId: DATABASE_ID,
+    tableId: TABLES.inboundParses.id,
+    queries: [Query.equal("$id", parseIds), Query.select(["$id", "messageId"]), Query.limit(parseIds.length)],
+    total: false,
+  });
+  const messageOf = new Map(parses.map((p) => [p.$id, p.messageId]));
+  const byMessage = new Map<string, FileRef[]>();
+  for (const a of rows) {
+    const messageId = a.inboundParseId ? messageOf.get(a.inboundParseId) : undefined;
+    if (!messageId) continue;
+    byMessage.set(messageId, [...(byMessage.get(messageId) ?? []), { id: a.$id, filename: a.filename, sizeBytes: a.sizeBytes }]);
+  }
+  return byMessage;
+}
 
 /**
  * The RFQ behind a conversation, checked against its request's owner. A
@@ -44,7 +74,11 @@ async function requireConversation(rfqId: string) {
 export async function loadConversation(rfqId: string): Promise<{ error?: string; conversation?: Conversation }> {
   try {
     const { rfq, supplier } = await requireConversation(rfqId);
-    const { messages } = await getThread(rfq.inboxId, rfq.threadId);
+    const [{ messages: raw }, files] = await Promise.all([
+      getThread(rfq.inboxId, rfq.threadId),
+      attachmentsByMessage(rfq.$id),
+    ]);
+    const messages = raw.map((m) => ({ ...m, attachments: files.get(m.messageId) ?? [] }));
     const theirs = messages.find((m) => m.direction === "in")?.from ?? messages.find((m) => m.direction === "out")?.to[0];
     return {
       conversation: { supplierName: supplier.name, supplierEmail: theirs ?? null, messages },

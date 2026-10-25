@@ -1,7 +1,7 @@
 import "server-only";
 
 import { Query } from "node-appwrite";
-import type { InboundParseRow, RfqRow, SupplierRow } from "@/lib/db/rows";
+import type { AttachmentRow, InboundParseRow, RfqRow, SupplierRow } from "@/lib/db/rows";
 import { DATABASE_ID, TABLES } from "@/lib/db/schema";
 import { db } from "@/lib/db/server";
 
@@ -15,6 +15,8 @@ export type HeldReply = {
   /** An unmatched reply is linked to a supplier by hand before it is read. */
   needsLink: boolean;
   linkable: { rfqId: string; supplierName: string }[];
+  /** PDFs that came with the reply, served through /api/attachments. */
+  attachments: { id: string; filename: string }[];
 };
 
 /**
@@ -63,13 +65,22 @@ export async function loadReviewQueue(requestId: string): Promise<HeldReply[]> {
   const held = [...matched.rows, ...unmatched.rows];
   if (held.length === 0) return [];
 
-  const supplierIds = [...new Set(rfqs.map((rfq) => rfq.supplierId))];
-  const { rows: suppliers } = await tables.listRows<SupplierRow>({
+  const { rows: files } = await tables.listRows<AttachmentRow>({
     databaseId: DATABASE_ID,
-    tableId: TABLES.suppliers.id,
-    queries: [Query.equal("$id", supplierIds), Query.limit(supplierIds.length)],
+    tableId: TABLES.attachments.id,
+    queries: [Query.equal("inboundParseId", held.map((p) => p.$id)), Query.limit(50)],
     total: false,
   });
+
+  const supplierIds = [...new Set(rfqs.map((rfq) => rfq.supplierId))];
+  const { rows: suppliers } = supplierIds.length
+    ? await tables.listRows<SupplierRow>({
+        databaseId: DATABASE_ID,
+        tableId: TABLES.suppliers.id,
+        queries: [Query.equal("$id", supplierIds), Query.limit(supplierIds.length)],
+        total: false,
+      })
+    : { rows: [] as SupplierRow[] };
   const supplierName = new Map(suppliers.map((s) => [s.$id, s.name]));
   const rfqById = new Map(rfqs.map((rfq) => [rfq.$id, rfq]));
 
@@ -90,6 +101,7 @@ export async function loadReviewQueue(requestId: string): Promise<HeldReply[]> {
       receivedAt: parse.$createdAt,
       needsLink: !parse.rfqId,
       linkable: parse.rfqId ? [] : linkable,
+      attachments: files.filter((f) => f.inboundParseId === parse.$id).map((f) => ({ id: f.$id, filename: f.filename })),
     };
   });
 }

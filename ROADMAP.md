@@ -221,6 +221,12 @@ from the demo mailbox, and the row flips to *Confirmed* with those numbers.
       discovery deadline raised from 15 s to 25 s (only 1 of 4 suppliers made 15 s on a cold
       cache)
 - [x] Branded 404 page
+- [x] PDF quotes (25 Oct, at the user's request): PDFs on replies are stored in the Appwrite
+      Storage bucket `6addafa900340bd5d7c7` (no public access), recorded in `attachments`,
+      and their text (via `unpdf`) is read with the reply; a text-less PDF (scan) goes to review
+      with the file attached. Owner-checked download route `/api/attachments/[id]`; file chips in
+      the Conversations panel and review queue. Verified: PDF-only quote → confirmed USD 88,000;
+      owner 200 (identical bytes), other user 404, signed out 401
 - [ ] Empty, loading and error states on every screen; mobile width
 - [ ] `npm run typecheck` and `npm run build` are clean
 

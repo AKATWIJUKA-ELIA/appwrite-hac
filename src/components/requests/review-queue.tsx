@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Inbox, Loader2, ShieldQuestion } from "lucide-react";
+import { Inbox, Loader2, Paperclip, ShieldQuestion } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -72,6 +72,23 @@ function ReviewItem({ item }: Readonly<{ item: HeldReply }>) {
         <ShieldQuestion />
         <AlertDescription>{item.reason}</AlertDescription>
       </Alert>
+
+      {item.attachments.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {item.attachments.map((file) => (
+            <a
+              key={file.id}
+              href={`/api/attachments/${file.id}`}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 rounded-md border bg-background px-2 py-1 text-xs font-medium hover:bg-accent"
+            >
+              <Paperclip className="size-3" />
+              {file.filename}
+            </a>
+          ))}
+        </div>
+      )}
 
       {item.preview && (
         <details className="mt-2 text-xs">
