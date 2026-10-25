@@ -4,7 +4,8 @@
 //
 // Idempotent: anything that already exists is left alone, anything missing is
 // created. It never drops or alters an existing column, so a changed column
-// definition has to be migrated by hand.
+// definition has to be migrated by hand. Enum columns are the one exception:
+// new values are added (never removed).
 
 import {
   AppwriteException,
@@ -104,9 +105,27 @@ async function waitForColumns(tableId: string) {
 
 async function ensureColumns(table: TableSpec) {
   const { columns } = await db.listColumns({ databaseId: DATABASE_ID, tableId: table.id });
-  const existing = new Set(columns.map((c) => (c as { key: string }).key));
+  const existing = new Map(columns.map((c) => [(c as { key: string }).key, c as { elements?: string[] }]));
   for (const col of table.columns) {
-    if (existing.has(col.key)) continue;
+    const current = existing.get(col.key);
+    // Enum values may only be added, never removed: rows already using an
+    // old value must stay valid. A new status lands here as an extension.
+    if (current && col.type === "enum") {
+      const missing = col.elements.filter((e) => !(current.elements ?? []).includes(e));
+      if (missing.length > 0) {
+        await db.updateEnumColumn({
+          databaseId: DATABASE_ID,
+          tableId: table.id,
+          key: col.key,
+          elements: [...(current.elements ?? []), ...missing],
+          required: col.required ?? false,
+          xdefault: col.required ? null : (col.default ?? null),
+        });
+        console.log(`column    ${table.id}.${col.key}  enum extended with ${missing.join(", ")}`);
+      }
+      continue;
+    }
+    if (current) continue;
     await createColumn(table.id, col);
     console.log(`column    ${table.id}.${col.key}  created (${col.type})`);
   }

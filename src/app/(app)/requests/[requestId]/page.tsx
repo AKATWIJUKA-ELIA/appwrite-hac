@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft, FileQuestion } from "lucide-react";
+import { Award } from "@/components/requests/award";
 import { Board } from "@/components/requests/board";
 import { ConversationsPanel, type ThreadSummary } from "@/components/requests/conversation";
 import { LiveRefresh } from "@/components/requests/live-refresh";
@@ -42,7 +43,7 @@ export default async function RequestPage({
     if (err instanceof UserFacingError) return <RequestNotFound />;
     throw err;
   }
-  const { request, lineItems, events, board, recipients, held, recommendation } = detail;
+  const { request, lineItems, events, board, recipients, held, recommendation, award } = detail;
   const confirmedCount = board.filter((row) => row.track === "confirmed").length;
 
   // One conversation per supplier actually emailed, with the figures read
@@ -105,6 +106,16 @@ export default async function RequestPage({
             <SendGate requestId={request.$id} recipients={recipients} />
           )}
           <Recommendation requestId={request.$id} recommendation={recommendation} rows={board} />
+          <Award
+            requestId={request.$id}
+            award={award}
+            recommendedQuoteId={recommendation?.quoteId ?? null}
+            options={board.flatMap((row) =>
+              row.track === "confirmed" && row.quoteId && row.totalMinor !== null && row.currency
+                ? [{ quoteId: row.quoteId, supplierName: row.supplierName, totalMinor: row.totalMinor, currency: row.currency }]
+                : [],
+            )}
+          />
           <Timeline events={events} />
         </div>
         {hasConversations && (

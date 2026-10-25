@@ -211,6 +211,12 @@ from the demo mailbox, and the row flips to *Confirmed* with those numbers.
 
 **Done when**: the Dell request ends at *Decided*, with a recommendation and a named trade-off.
 
+- [x] Award & purchase order (25 Oct): new `awarded` status (setup script now extends enums
+      additively) and `awardedQuoteId` / `poNumber` / `awardedAt` on requests. The buyer picks a
+      confirmed supplier, edits a drafted PO, and it goes as a reply on that supplier's thread;
+      optional polite declines to the others. Verified: other user refused, web price refused,
+      malformed PO refused, award sent + 1 decline delivered, second award refused
+
 ### Phase 6: Hardening and an end-to-end run · Thu 29 Oct
 - [x] Full run on the deployed app (25 Oct): extraction + discovery to approval in 24.3 s on
       Sites; add address, approve, send, conversation, recommendation refusal all verified live.

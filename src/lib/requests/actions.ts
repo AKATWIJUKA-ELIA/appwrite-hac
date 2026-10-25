@@ -60,6 +60,9 @@ export async function createRequest(
         deliveryWindowDays: null,
         budgetMinor: null,
         failureReason: null,
+        awardedQuoteId: null,
+        poNumber: null,
+        awardedAt: null,
       },
       permissions: ownerPermissions(user.$id),
     });

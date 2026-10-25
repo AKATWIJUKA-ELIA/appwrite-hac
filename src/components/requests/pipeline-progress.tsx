@@ -17,6 +17,7 @@ const STAGES = [
   { key: "approve", label: "Your approval" },
   { key: "collect", label: "Collect quotes" },
   { key: "decide", label: "Decide" },
+  { key: "award", label: "Award" },
 ] as const;
 
 // Index of the stage a status sits in. Everything before it is done.
@@ -27,6 +28,7 @@ const ORDER: Partial<Record<RequestStatus, number>> = {
   awaiting_approval: 2,
   collecting: 3,
   decided: 4,
+  awarded: 5,
 };
 
 export function PipelineProgress({
@@ -56,9 +58,12 @@ export function PipelineProgress({
           // With every contacted supplier answered, collecting is finished in
           // fact even though the status waits for the buyer's decision.
           const allIn = readyToDecide && awaiting === 0 && stage.key === "collect";
-          const done = index < current || status === "decided" || allIn;
-          const active = index === current && status !== "decided" && !allIn;
-          const yourMove = readyToDecide && stage.key === "decide";
+          // Decided means the choice is made and the order is the next step.
+          const decidedHere = status === "decided" && stage.key === "decide";
+          const done = index < current || status === "awarded" || allIn || decidedHere;
+          const active = index === current && status !== "awarded" && !allIn && !decidedHere;
+          const yourMove =
+            (readyToDecide && stage.key === "decide") || (status === "decided" && stage.key === "award");
 
           return (
             <li key={stage.key} className="flex items-center gap-1">

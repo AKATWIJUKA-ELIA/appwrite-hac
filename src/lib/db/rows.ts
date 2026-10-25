@@ -22,6 +22,9 @@ export type RequestRow = Models.Row & {
   budgetMinor: number | null;
   currency: string;
   failureReason: string | null;
+  awardedQuoteId: string | null;
+  poNumber: string | null;
+  awardedAt: string | null;
 };
 
 export type LineItemRow = Models.Row & {
