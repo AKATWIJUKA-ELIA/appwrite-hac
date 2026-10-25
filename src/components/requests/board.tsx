@@ -40,7 +40,30 @@ export function Board({ rows, multiItem = false }: Readonly<{ rows: BoardRow[]; 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Comparison board</CardTitle>
+        <CardTitle className="flex items-center gap-1.5">
+          Comparison board
+          {rows.length > 0 && (
+            // The key, on demand: only the labels actually on the board.
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <button type="button" aria-label="What these labels mean" className="text-muted-foreground hover:text-foreground" />
+                }
+              >
+                <Info className="size-4" />
+              </TooltipTrigger>
+              <TooltipContent className="max-w-sm space-y-1.5 py-2">
+                {(Object.keys(TRACK_COPY) as BoardTrack[])
+                  .filter((track) => rows.some((row) => row.track === track))
+                  .map((track) => (
+                    <p key={track}>
+                      <span className="font-semibold">{TRACK_COPY[track].label}:</span> {TRACK_COPY[track].hint}
+                    </p>
+                  ))}
+              </TooltipContent>
+            </Tooltip>
+          )}
+        </CardTitle>
         <CardDescription>
           {rows.length === 0
             ? "Rows appear here the moment a supplier is found."
@@ -201,30 +224,6 @@ export function Board({ rows, multiItem = false }: Readonly<{ rows: BoardRow[]; 
                   })}
                 </TableBody>
               </Table>
-            </div>
-
-            {/* Only explain the labels actually present. A key describing
-                "Awaiting reply" under a board with no awaiting rows reads as a
-                live status rather than a definition. */}
-            <div className="rounded-lg border bg-muted/30 p-3">
-              <p className="mb-2 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                <Info className="size-3.5" />
-                What these labels mean
-              </p>
-              <dl className="grid gap-2 sm:grid-cols-2">
-                {(Object.keys(TRACK_COPY) as BoardTrack[])
-                  .filter((track) => rows.some((row) => row.track === track))
-                  .map((track) => (
-                    <div key={track} className="flex items-start gap-2">
-                      <dt className="shrink-0">
-                        <TrackBadge track={track} />
-                      </dt>
-                      <dd className="text-xs leading-relaxed text-muted-foreground">
-                        {TRACK_COPY[track].hint}
-                      </dd>
-                    </div>
-                  ))}
-              </dl>
             </div>
           </div>
         )}

@@ -6,10 +6,12 @@ import { Board } from "@/components/requests/board";
 import { ConversationsPanel, type ThreadSummary } from "@/components/requests/conversation";
 import { LiveRefresh } from "@/components/requests/live-refresh";
 import { Recommendation } from "@/components/requests/recommendation";
-import { RequestHeader } from "@/components/requests/request-header";
+import { RequestDetails, RequestHeader } from "@/components/requests/request-header";
+import { RequestRealtime } from "@/components/requests/request-realtime";
+import { RequestWorkspace } from "@/components/requests/request-workspace";
 import { ReviewQueue } from "@/components/requests/review-queue";
 import { SendGate } from "@/components/requests/send-gate";
-import { Timeline } from "@/components/requests/timeline";
+import { ActivitySheet } from "@/components/requests/timeline";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { HOME_PATH } from "@/lib/auth/constants";
@@ -20,15 +22,13 @@ import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Request · Quotebook" };
 
-// How the page keeps itself current, per status. Each refresh costs a dozen
-// database reads, so this is a budget, not a nicety. Extraction and discovery
-// finish in well under a minute: refresh fast, briefly. Replies take hours or
-// days: check occasionally while someone is looking. Statuses that wait on a
-// person (approval, decided, failed) never poll.
+// Fallback polling, on top of Realtime (RequestRealtime), for the two steps
+// the buyer actually sits and watches. Each refresh costs a dozen database
+// reads, so it is brief: extraction and discovery finish in well under a
+// minute. Replies arrive through Realtime alone, however long they take.
 const REFRESH: Partial<Record<RequestStatus, { intervalMs: number; maxDurationMs: number }>> = {
   extracting: { intervalMs: 3_000, maxDurationMs: 3 * 60_000 },
   discovering: { intervalMs: 3_000, maxDurationMs: 3 * 60_000 },
-  collecting: { intervalMs: 60_000, maxDurationMs: 15 * 60_000 },
 };
 
 export default async function RequestPage({
@@ -74,49 +74,77 @@ export default async function RequestPage({
     });
   const hasConversations = threads.length > 0;
 
+  // Panels shared by several steps.
+  const board$ = <Board rows={board} multiItem={lineItems.length > 1} />;
+  // Held replies explain why a supplier who wrote back still reads "awaiting".
+  const held$ = <ReviewQueue held={held} />;
+  const award$ = (
+    <Award
+      requestId={request.$id}
+      award={award}
+      recommendedQuoteId={recommendation?.quoteId ?? null}
+      options={board.flatMap((row) =>
+        row.track === "confirmed" && row.quoteId && row.totalMinor !== null && row.currency
+          ? [{ quoteId: row.quoteId, supplierName: row.supplierName, totalMinor: row.totalMinor, currency: row.currency }]
+          : [],
+      )}
+    />
+  );
+
   return (
     <div className={cn("mx-auto w-full space-y-4", hasConversations ? "max-w-7xl" : "max-w-5xl")}>
+      {/* Live updates: Realtime pushes every new event for this request. The
+          short polling while reading and searching is a fallback only. */}
+      <RequestRealtime requestId={request.$id} />
       <LiveRefresh
         key={request.status}
         intervalMs={REFRESH[request.status]?.intervalMs ?? null}
         maxDurationMs={REFRESH[request.status]?.maxDurationMs ?? 0}
       />
-      <RequestHeader
-        request={request}
-        lineItems={lineItems}
-        confirmedCount={confirmedCount}
-        awaitingCount={board.filter((row) => row.track === "awaiting").length}
-      />
+      <RequestHeader request={request} confirmedCount={confirmedCount} actions={<ActivitySheet events={events} />} />
       <div className={cn("gap-4", hasConversations && "grid lg:grid-cols-[minmax(0,1fr)_24rem]")}>
-        <div className="min-w-0 space-y-4">
-          <Board rows={board} multiItem={lineItems.length > 1} />
-          {/* On narrow screens the conversations follow the board directly,
-              where a reply is most likely to be looked for. */}
+        <div className="min-w-0">
+          <RequestWorkspace
+            status={request.status}
+            quotesIn={confirmedCount}
+            awaiting={board.filter((row) => row.track === "awaiting").length}
+            hasLineItems={lineItems.length > 0}
+            panels={{
+              read: <RequestDetails request={request} lineItems={lineItems} />,
+              find: board$,
+              // Hidden while discovery is still adding suppliers, so nobody
+              // approves a list that is about to change under them.
+              approve:
+                request.status === "discovering" || request.status === "extracting" ? undefined : (
+                  <>
+                    <SendGate requestId={request.$id} recipients={recipients} />
+                    {board$}
+                  </>
+                ),
+              collect: (
+                <>
+                  {held$}
+                  {board$}
+                  <Recommendation requestId={request.$id} recommendation={recommendation} rows={board} />
+                </>
+              ),
+              award: (
+                <>
+                  {held$}
+                  {award$}
+                  {recommendation && (
+                    <Recommendation requestId={request.$id} recommendation={recommendation} rows={board} />
+                  )}
+                </>
+              ),
+            }}
+          />
+          {/* On narrow screens the conversations follow the step's panel. */}
           {hasConversations && (
-            <div className="lg:hidden">
+            <div className="mt-4 lg:hidden">
               <ConversationsPanel threads={threads} />
             </div>
           )}
-          {/* Held replies sit directly under the board: they are the reason a row
-              still reads "awaiting" when a supplier has in fact written back. */}
-          <ReviewQueue held={held} />
-          {/* Hidden while discovery is still adding suppliers, so nobody approves
-              a list that is about to change under them. */}
-          {request.status !== "discovering" && request.status !== "extracting" && (
-            <SendGate requestId={request.$id} recipients={recipients} />
-          )}
-          <Recommendation requestId={request.$id} recommendation={recommendation} rows={board} />
-          <Award
-            requestId={request.$id}
-            award={award}
-            recommendedQuoteId={recommendation?.quoteId ?? null}
-            options={board.flatMap((row) =>
-              row.track === "confirmed" && row.quoteId && row.totalMinor !== null && row.currency
-                ? [{ quoteId: row.quoteId, supplierName: row.supplierName, totalMinor: row.totalMinor, currency: row.currency }]
-                : [],
-            )}
-          />
-          <Timeline events={events} />
         </div>
         {hasConversations && (
           <aside className="hidden lg:block">
