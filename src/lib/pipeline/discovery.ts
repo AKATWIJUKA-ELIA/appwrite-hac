@@ -36,12 +36,13 @@ import { clip, nullable, openAiJson, PARSING_MODEL, strictObject } from "@/lib/s
 // so this number is the per-run inference bill, not a tuning knob.
 const MAX_CANDIDATES = 4;
 
-// Extraction and discovery share one host request with a 30-second limit.
-// Measured: extraction ~8 s, search ~2 s, and most candidates finish within
-// ~15 s, but one slow site took 30 s on its own. A candidate that misses this
-// deadline is dropped rather than holding the whole board back.
-const CANDIDATE_DEADLINE_MS = 15_000;
-const SCRAPE_TIMEOUT_MS = 10_000;
+// Background work on the host outlives its 30-second response limit (a live
+// probe ran 45 s after its response), so the bound here is about the buyer's
+// wait, not the host. Cold scrapes plus a contact page can take ~20 s; one
+// slow site took 30 s on its own. A candidate that misses this deadline is
+// dropped rather than holding the whole board back.
+const CANDIDATE_DEADLINE_MS = 25_000;
+const SCRAPE_TIMEOUT_MS = 15_000;
 
 // One line per failed site. A dead or slow supplier page is routine during
 // discovery, and the SDK's full error object buries the log.

@@ -212,10 +212,15 @@ from the demo mailbox, and the row flips to *Confirmed* with those numbers.
 **Done when**: the Dell request ends at *Decided*, with a recommendation and a named trade-off.
 
 ### Phase 6: Hardening and an end-to-end run · Thu 29 Oct
-- [ ] Full run on the deployed app, from a fresh account, with two suppliers (one replies,
-      one stays silent)
-- [ ] Ownership checks: a second account cannot open, act on, or see the rows of the first
-      account's request
+- [x] Full run on the deployed app (25 Oct): extraction + discovery to approval in 24.3 s on
+      Sites; add address, approve, send, conversation, recommendation refusal all verified live.
+      Supplier reply → confirmed quote verified live by the user on 24 Oct.
+- [x] Ownership checks: a second account cannot open the page, approve, or read the
+      conversation of the first account's request (verified live)
+- [x] Live probe: `after()` work on Sites survives 45 s past the response; per-candidate
+      discovery deadline raised from 15 s to 25 s (only 1 of 4 suppliers made 15 s on a cold
+      cache)
+- [x] Branded 404 page
 - [ ] Empty, loading and error states on every screen; mobile width
 - [ ] `npm run typecheck` and `npm run build` are clean
 
