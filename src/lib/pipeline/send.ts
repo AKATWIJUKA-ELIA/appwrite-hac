@@ -3,6 +3,7 @@ import "server-only";
 import { Query } from "node-appwrite";
 import type { ContactRow, RequestRow, RfqRow } from "@/lib/db/rows";
 import { DATABASE_ID, TABLES } from "@/lib/db/schema";
+import { emailFailure } from "@/lib/errors";
 import { db, recordEvent, withTransaction } from "@/lib/db/server";
 import { finalizeRfqBody } from "@/lib/rfq-text";
 import { rfqInboxId, sendMessage } from "@/lib/server/agentmail";
@@ -16,7 +17,7 @@ const errorText = (error: unknown) => (error instanceof Error ? error.message : 
  * with the reason, and the rest still go. A failed RFQ keeps its approval, so
  * Retry sends it again without asking the buyer to re-tick it.
  */
-export async function sendApproved(requestId: string): Promise<void> {
+export async function sendApproved(requestId: string, onlyRfqId?: string): Promise<void> {
   const tables = db();
   const request = await tables.getRow<RequestRow>({
     databaseId: DATABASE_ID,
@@ -26,7 +27,13 @@ export async function sendApproved(requestId: string): Promise<void> {
   const { rows: rfqs } = await tables.listRows<RfqRow>({
     databaseId: DATABASE_ID,
     tableId: TABLES.rfqs.id,
-    queries: [Query.equal("requestId", requestId), Query.equal("status", "approved"), Query.limit(50)],
+    queries: [
+      Query.equal("requestId", requestId),
+      Query.equal("status", "approved"),
+      // A single-supplier retry sends that one and leaves the rest untouched.
+      ...(onlyRfqId ? [Query.equal("$id", onlyRfqId)] : []),
+      Query.limit(50),
+    ],
     total: false,
   });
   if (rfqs.length === 0) return;
@@ -48,7 +55,8 @@ export async function sendApproved(requestId: string): Promise<void> {
     if (!process.env.AGENTMAIL_API_KEY) throw new Error("AGENTMAIL_API_KEY is not set");
   } catch (error) {
     for (const rfq of rfqs) {
-      await markRfqFailed(request, rfq, `Email is not configured on this server: ${errorText(error)}`);
+      console.error(`[send] email not configured: ${errorText(error)}`);
+      await markRfqFailed(request, rfq, emailFailure(error, "this supplier"));
     }
     return;
   }
@@ -91,7 +99,9 @@ export async function sendApproved(requestId: string): Promise<void> {
         });
       });
     } catch (error) {
-      await markRfqFailed(request, rfq, `Send to ${email} failed: ${errorText(error)}`);
+      // The provider's raw answer goes to the log; the buyer reads a sentence.
+      console.error(`[send] to ${email} failed: ${errorText(error)}`);
+      await markRfqFailed(request, rfq, emailFailure(error, email));
     }
   }
 }

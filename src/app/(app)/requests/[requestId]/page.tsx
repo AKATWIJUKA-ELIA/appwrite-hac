@@ -142,14 +142,14 @@ export default async function RequestPage({
           {/* On narrow screens the conversations follow the step's panel. */}
           {hasConversations && (
             <div className="mt-4 lg:hidden">
-              <ConversationsPanel threads={threads} />
+              <ConversationsPanel threads={threads} version={events[0]?.$createdAt} />
             </div>
           )}
         </div>
         {hasConversations && (
           <aside className="hidden lg:block">
             <div className="sticky top-4">
-              <ConversationsPanel threads={threads} />
+              <ConversationsPanel threads={threads} version={events[0]?.$createdAt} />
             </div>
           </aside>
         )}

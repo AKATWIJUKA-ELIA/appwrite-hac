@@ -4,6 +4,7 @@ import { Query } from "node-appwrite";
 import type { EventRow, LineItemRow, QuoteRow, RequestRow } from "@/lib/db/rows";
 import { DATABASE_ID, TABLES } from "@/lib/db/schema";
 import { db, plain, requireOwnedRequest } from "@/lib/db/server";
+import { presentableReason } from "@/lib/errors";
 import { requireUser } from "@/lib/auth/session";
 import { loadBoard, type BoardRow } from "@/lib/requests/board";
 import { loadRecipients, type Recipient } from "@/lib/requests/recipients";
@@ -99,5 +100,7 @@ export async function getRequestDetail(requestId: string): Promise<RequestDetail
     loadAwardSummary(request),
   ]);
   // Plain data only: this goes straight into client components.
-  return plain({ request, lineItems: lineItems.rows, events: events.rows, board, recipients, held, recommendation, award });
+  // Older failure events stored a provider's raw response; show them in words.
+  const timeline = events.rows.map((e) => (e.kind.includes("failed") ? { ...e, message: presentableReason(e.message) ?? e.message } : e));
+  return plain({ request, lineItems: lineItems.rows, events: timeline, board, recipients, held, recommendation, award });
 }

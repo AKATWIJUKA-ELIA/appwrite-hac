@@ -3,6 +3,7 @@ import "server-only";
 import { Query } from "node-appwrite";
 import type { AttachmentRow, InboundParseRow, RfqRow, SupplierRow } from "@/lib/db/rows";
 import { DATABASE_ID, TABLES } from "@/lib/db/schema";
+import { presentableReason } from "@/lib/errors";
 import { db } from "@/lib/db/server";
 
 export type HeldReply = {
@@ -94,7 +95,7 @@ export async function loadReviewQueue(requestId: string): Promise<HeldReply[]> {
     const rfq = parse.rfqId ? rfqById.get(parse.rfqId) : undefined;
     return {
       parseId: parse.$id,
-      reason: parse.reason ?? "Held for review.",
+      reason: presentableReason(parse.reason) ?? "Held for review.",
       fromAddress: parse.fromAddress,
       preview: (parse.text ?? "").slice(0, 600),
       supplierName: rfq ? (supplierName.get(rfq.supplierId) ?? null) : null,

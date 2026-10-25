@@ -3,12 +3,13 @@ import "server-only";
 import { after } from "next/server";
 import { recordEvent, db, UserFacingError } from "@/lib/db/server";
 import { DATABASE_ID, TABLES } from "@/lib/db/schema";
+import { stepFailure } from "@/lib/errors";
 
 export type Step = "extract" | "discover" | "send";
 
-// How a failure reads on the request page: "Extraction failed: <cause>".
+// The step's name in the buyer's words, used in failure messages.
 const STEP_LABEL: Record<Step, string> = {
-  extract: "Extraction",
+  extract: "Reading the request",
   discover: "Supplier search",
   send: "Sending",
 };
@@ -44,9 +45,9 @@ export async function markRequestFailed(
   err: unknown,
 ): Promise<void> {
   const cause = err instanceof Error ? err.message : String(err);
-  // A UserFacingError is already a sentence for the buyer; anything else is a
-  // technical cause, named by the step it broke.
-  const reason = err instanceof UserFacingError ? cause : `${STEP_LABEL[step]} failed: ${cause}`;
+  // A UserFacingError is already a sentence; anything else is translated,
+  // and its technical cause stays in the log below.
+  const reason = err instanceof UserFacingError ? cause : stepFailure(err, STEP_LABEL[step]);
   console.error(`[step:${step}] request ${request.id} failed:`, cause);
   try {
     await db().updateRow({

@@ -17,6 +17,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import type { LineItemRow, RequestRow } from "@/lib/db/rows";
+import { presentableReason } from "@/lib/errors";
 import { formatMoney } from "@/lib/format";
 import { cancelDiscovery, retryRequest } from "@/lib/requests/actions";
 
@@ -84,7 +85,7 @@ export function RequestHeader({
         </div>
 
         {request.status === "failed" && (
-          <RetryRequest requestId={request.$id} reason={request.failureReason ?? "This request failed."} />
+          <RetryRequest requestId={request.$id} reason={presentableReason(request.failureReason) ?? "This request failed."} />
         )}
       </CardContent>
     </Card>

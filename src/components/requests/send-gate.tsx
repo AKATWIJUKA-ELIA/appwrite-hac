@@ -53,9 +53,10 @@ export function SendGate({
   const drafts = recipients.filter((rfq) => rfq.status === "draft");
   // "approved" means approved but never dispatched — stalled, not sent. It
   // belongs with the failures, because the recovery is identical.
-  const stalled = recipients.filter((rfq) => rfq.status === "failed" || rfq.status === "approved");
+  // A bounce is recovered the same way: change the address, retry.
+  const stalled = recipients.filter((rfq) => rfq.status === "failed" || rfq.status === "approved" || rfq.status === "bounced");
   const dispatched = recipients.filter(
-    (rfq) => rfq.status !== "draft" && rfq.status !== "failed" && rfq.status !== "approved",
+    (rfq) => rfq.status !== "draft" && rfq.status !== "failed" && rfq.status !== "approved" && rfq.status !== "bounced",
   );
   const reachable = drafts.filter((rfq) => rfq.email !== null);
   // A selection can outlive its row's address (cleared with "Change").
@@ -280,6 +281,8 @@ function FailedSends({ requestId, failed }: Readonly<{ requestId: string; failed
             {reasons.length > 1 && rfq.failureReason && (
               <span className="text-xs text-muted-foreground">{rfq.failureReason}</span>
             )}
+            <RetryOne requestId={requestId} rfq={rfq} disabled={pending} />
+            {rfq.status !== "approved" && <ReplaceAddress rfq={rfq} />}
           </li>
         ))}
       </ul>
@@ -290,11 +293,38 @@ function FailedSends({ requestId, failed }: Readonly<{ requestId: string; failed
         </Alert>
       )}
 
-      <Button variant="outline" onClick={retry} disabled={pending}>
-        {pending ? <Loader2 className="animate-spin" /> : <RotateCcw />}
-        Retry {failed.length} send{failed.length === 1 ? "" : "s"}
-      </Button>
+      {failed.length > 1 && (
+        <Button variant="outline" onClick={retry} disabled={pending}>
+          {pending ? <Loader2 className="animate-spin" /> : <RotateCcw />}
+          Retry all {failed.length}
+        </Button>
+      )}
     </div>
+  );
+}
+
+/** Retry one supplier, e.g. right after changing its address. */
+function RetryOne({ requestId, rfq, disabled }: Readonly<{ requestId: string; rfq: Recipient; disabled: boolean }>) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+
+  function retry() {
+    startTransition(async () => {
+      const result = await retrySend(requestId, rfq.rfqId);
+      if (result.error) {
+        toast.error(result.error);
+        return;
+      }
+      toast.success(`Retrying the send to ${rfq.supplierName}.`);
+      router.refresh();
+    });
+  }
+
+  return (
+    <Button size="sm" variant="outline" className="ml-auto h-7" onClick={retry} disabled={disabled || pending}>
+      {pending ? <Loader2 className="animate-spin" /> : <RotateCcw />}
+      Retry
+    </Button>
   );
 }
 
@@ -446,5 +476,48 @@ function PreviewEmail({ rfq }: Readonly<{ rfq: Recipient }>) {
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/**
+ * A failed or bounced send is usually the address's fault. Swap it here, then
+ * Retry sends to the new one; the approval stands.
+ */
+function ReplaceAddress({ rfq }: Readonly<{ rfq: Recipient }>) {
+  const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  function save(event: React.FormEvent) {
+    event.preventDefault();
+    setError(null);
+    startTransition(async () => {
+      const result = await addContact(rfq.rfqId, email);
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      setEmail("");
+      toast.success(`Address changed for ${rfq.supplierName}. Retry to send to it.`);
+      router.refresh();
+    });
+  }
+
+  return (
+    <form onSubmit={save} className="flex w-full flex-wrap gap-2 pt-1">
+      <Input
+        type="email"
+        value={email}
+        onChange={(event) => setEmail(event.target.value)}
+        placeholder={`Use a different address for ${rfq.supplierName}`}
+        className="h-8 min-w-0 flex-1 font-mono text-xs"
+      />
+      <Button type="submit" size="sm" variant="secondary" disabled={pending || !email.trim()}>
+        {pending ? <Loader2 className="animate-spin" /> : null}
+        Change address
+      </Button>
+      {error && <p className="w-full text-xs text-destructive">{error}</p>}
+    </form>
   );
 }

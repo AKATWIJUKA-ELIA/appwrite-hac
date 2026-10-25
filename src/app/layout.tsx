@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Geist, JetBrains_Mono } from "next/font/google";
 import { AppwritePing } from "@/components/appwrite-ping";
 import { ThemeProvider } from "@/components/theme-provider";
-import { Toaster } from "@/components/ui/sonner";
+import { Toaster, TOAST_DURATION_MS } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import "./globals.css";
@@ -23,7 +23,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <ThemeProvider>
           <AppwritePing />
           <TooltipProvider>{children}</TooltipProvider>
-          <Toaster richColors closeButton />
+          <Toaster richColors closeButton position="top-right" duration={TOAST_DURATION_MS} />
         </ThemeProvider>
       </body>
     </html>
